@@ -1,0 +1,345 @@
+<title>WINDFOR Upgrade Diagnostics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #FAFBFC; --panel: #EEF2F4; --ink: #131C24; --ink2: #3F4C58; --muted: #66737F; --rule: #D6DDE3; --rule2: #E6EBEF;
+  --obs: #131C24; --neso: #B64342; --wx: #7B52AE; --up: #008C80; --ref: #87929C;
+  --band: color-mix(in srgb, var(--up) 17%, transparent); --shade: color-mix(in srgb, var(--neso) 9%, transparent);
+  --display: "Archivo", "Arial Narrow", Arial, sans-serif; --body: "Public Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #121920; --panel: #1A232C; --ink: #E3E9EE; --ink2: #B0BCC6; --muted: #83909B; --rule: #2C3743; --rule2: #202A34;
+    --obs: #E3E9EE; --neso: #DE6A5E; --wx: #9B7DDB; --up: #2BA99C; --ref: #8492A0;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #121920; --panel: #1A232C; --ink: #E3E9EE; --ink2: #B0BCC6; --muted: #83909B; --rule: #2C3743; --rule2: #202A34;
+  --obs: #E3E9EE; --neso: #DE6A5E; --wx: #9B7DDB; --up: #2BA99C; --ref: #8492A0;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 20px; padding-block: 40px 72px; display: grid; gap: 56px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 4.8vw, 54px); font-weight: 760; font-stretch: 116%; line-height: 1.03; letter-spacing: -0.012em; max-width: 20ch; }
+h2 { font-size: 23px; font-weight: 680; font-stretch: 110%; line-height: 1.2; }
+p { margin: 0; max-width: 68ch; color: var(--ink2); }
+.eyebrow, .label { font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+header { display: grid; gap: 18px; }
+.dek { font-size: 18px; }
+.issue { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 2px solid var(--ink); margin-top: 8px; max-width: 760px; }
+.issue div { padding: 10px 12px 0 0; display: grid; gap: 2px; font-size: 14px; color: var(--ink2); }
+.issue b { font: 500 13px var(--mono); color: var(--ink); }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: var(--panel); border-radius: 6px; }
+.kpi { padding: 20px 22px; display: grid; gap: 6px; align-content: start; }
+.kpi + .kpi { border-left: 1px solid var(--rule); }
+.kpi .big { font: 600 clamp(26px, 2.9vw, 34px)/1.05 var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.kpi .big small { font-size: 15px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+.kpi p { font-size: 14px; }
+.up { color: var(--up); } .neso { color: var(--neso); }
+section { display: grid; gap: 16px; border-top: 1px solid var(--rule); padding-top: 22px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; color: var(--ink2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 20px; height: 0; border-top: 2.5px solid var(--c); display: inline-block; }
+.sw.dash { border-top-style: dashed; }
+.sw.fill { height: 10px; border: 0; background: var(--band); }
+.plot-host { position: relative; width: 100%; }
+svg.plot { display: block; overflow: visible; }
+svg .grid { stroke: var(--rule2); stroke-width: 1; }
+svg .axis { stroke: var(--rule); stroke-width: 1.5; }
+svg .tick { fill: var(--muted); font: 12px var(--mono); }
+svg .hair { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+svg .band { fill: var(--band); }
+svg .shade { fill: var(--shade); }
+.tip { position: absolute; z-index: 2; pointer-events: none; background: var(--bg); border: 1px solid var(--rule); border-radius: 6px;
+  padding: 8px 10px; font-size: 13px; box-shadow: 0 4px 14px rgb(0 0 0 / .12); min-width: 200px; display: grid; gap: 3px; }
+.tip[hidden] { display: none; }
+.tip .when { font: 500 12px var(--mono); color: var(--muted); margin-bottom: 2px; }
+.tr { display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: center; color: var(--ink2); }
+.tr b { font: 500 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+button, .chip { font: 500 13px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 5px; padding: 6px 11px; cursor: pointer; }
+button:hover, .chip:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, .chip:focus-visible { outline: 2px solid var(--up); outline-offset: 2px; }
+.chip[aria-pressed="true"] { border-color: var(--neso); background: var(--shade); }
+.range { font: 500 14px var(--mono); min-width: 190px; }
+input[type="range"] { flex: 1 1 240px; accent-color: var(--up); min-width: 0; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink2); cursor: pointer; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: grid; gap: 1px; text-align: left; padding: 7px 11px; }
+.chip span { font: 12px var(--mono); color: var(--muted); }
+.chip .num { font-size: 13px; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; }
+.two > div { display: grid; gap: 12px; align-content: start; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+th { font: 500 12px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 8px 10px; border-bottom: 1.5px solid var(--ink); }
+th:first-child, td:first-child { text-align: left; padding-left: 0; }
+td { padding: 10px; border-bottom: 1px solid var(--rule2); text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+td:first-child { font-family: var(--body); white-space: normal; }
+td:first-child small { display: block; color: var(--muted); font-size: 12.5px; }
+tr.hl td { background: color-mix(in srgb, var(--up) 9%, transparent); }
+tr.hl td:first-child { font-weight: 600; }
+.bar { display: inline-block; height: 6px; border-radius: 3px; background: var(--c); vertical-align: middle; margin-right: 8px; opacity: .85; }
+.ci { color: var(--muted); }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 10px 24px; margin: 0; max-width: 900px; }
+dt { font: 500 12px/1.6 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+dd { margin: 0; color: var(--ink2); }
+code { font: 13px var(--mono); }
+@media (max-width: 820px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi:nth-child(3) { border-left: 0; }
+  .kpi:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 480px) {
+  .wrap { padding-inline: 16px; gap: 44px; }
+  .kpis { grid-template-columns: minmax(0, 1fr); }
+  .kpi + .kpi { border-left: 0; border-top: 1px solid var(--rule); }
+  .issue { grid-template-columns: minmax(0, 1fr); }
+  dl { grid-template-columns: minmax(0, 1fr); gap: 2px 0; } dd { margin-bottom: 10px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow" id="eyebrow">GB wind · day-ahead · held-out test</div>
+    <h1 id="headline">TabPFN-3.5 upgrades NESO's day-ahead wind forecast</h1>
+    <p class="dek" id="dek"></p>
+    <div class="issue" aria-label="Forecast timing">
+      <div><b>D−1 07:30 UTC</b>NESO publishes WINDFOR (08:30 in summer)</div>
+      <div><b>+15 min</b>TabPFN issues its upgrade</div>
+      <div><b>D 00:00–23:00 UTC</b>Delivery hours, 15–39 h ahead</div>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <section aria-labelledby="ex-h">
+    <div class="head"><h2 id="ex-h">A week of forecasts</h2><div class="legend" id="ex-legend"></div></div>
+    <div class="controls">
+      <button id="prev" aria-label="Previous week">← Week</button>
+      <button id="next" aria-label="Next week">Week →</button>
+      <span class="range" id="range"></span>
+      <input type="range" id="slider" step="24" aria-label="Choose week">
+      <label class="check"><input type="checkbox" id="show-wx"> Weather-only TabPFN</label>
+      <label class="check"><input type="checkbox" id="show-band" checked> 10–90% band</label>
+    </div>
+    <div class="plot-host" id="ex"></div>
+    <div class="label">WINDFOR's worst days — jump to one</div>
+    <div class="chips" id="worst"></div>
+  </section>
+
+  <section aria-labelledby="sb-h">
+    <div class="head"><h2 id="sb-h">Scoreboard</h2><span class="label" id="sb-note"></span></div>
+    <div class="scroll"><table id="score"></table></div>
+    <p id="sb-text"></p>
+  </section>
+
+  <section aria-labelledby="mo-h">
+    <div class="head"><h2 id="mo-h">Month by month</h2><div class="legend" id="mo-legend"></div></div>
+    <div class="controls"><label class="check"><input type="checkbox" id="show-frozen"> Frozen context (2024 only, never refit)</label></div>
+    <div class="plot-host" id="mo"></div>
+    <p id="mo-text"></p>
+  </section>
+
+  <section aria-labelledby="wh-h">
+    <div class="head"><h2 id="wh-h">Where the gain comes from</h2><div class="legend" id="wh-legend"></div></div>
+    <div class="two">
+      <div><div class="label">Mean absolute error by lead time</div><div class="plot-host" id="lead"></div><p id="lead-text"></p></div>
+      <div><div class="label">Mean absolute error by WINDFOR level, known at issue</div><div class="plot-host" id="level"></div><p id="level-text"></p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="ca-h">
+    <div class="head"><h2 id="ca-h">Can the uncertainty be trusted?</h2><div class="legend" id="ca-legend"></div></div>
+    <div class="two">
+      <div><div class="label">Share of hours below each predicted decile</div><div class="plot-host" id="rel"></div></div>
+      <div><p id="ca-text"></p></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="me-h">
+    <h2 id="me-h">How the test was run</h2>
+    <dl>
+      <dt>Question</dt><dd>Given NESO's morning WINDFOR vintage and open ECMWF weather, can TabPFN-3.5 issue a better forecast of tomorrow's hourly GB wind, fifteen minutes later?</dd>
+      <dt>Target</dt><dd>Available transmission wind: metered FUELHH output plus curtailment paid for in the Balancing Mechanism (BOAV), hour-ending means. WINDFOR forecasts output before curtailment, so this is its like-for-like target.</dd>
+      <dt>Inputs</dt><dd>ECMWF IFS 0.25° 100 m wind at 20 capacity-weighted points, turned into power-curve capacity factors and wind direction; installed capacity, lead, hour, season; and the WINDFOR value for the hour. Only the newest weather run public before WINDFOR is used.</dd>
+      <dt>Model</dt><dd>TabPFN-3.5 via <code>tabpfn-client</code>, no training or tuning: each month it is handed every hour settled at least a day before issue as context and predicts capacity factor deciles. The median is the point forecast.</dd>
+      <dt>Test</dt><dd id="me-test"></dd>
+      <dt>Code</dt><dd><code>windpfn/model.py</code>, <code>03_test.ipynb</code>, protocol in <code>docs/method.md</code>. Page data built by <code>scripts/diagnostics.py</code>.</dd>
+    </dl>
+  </section>
+</div>
+
+<script src="data.js"></script>
+<script>
+const D = window.DATA, NS = "http://www.w3.org/2000/svg", $ = s => document.querySelector(s);
+const UP = "tabpfn+windfor", WX = "tabpfn";
+const S = {
+  y: { name: "Outturn", c: "var(--obs)", w: 2 },
+  windfor: { name: "WINDFOR (NESO)", c: "var(--neso)" },
+  "windfor debiased": { name: "WINDFOR, debiased", c: "var(--neso)", dash: "2 3" },
+  blend: { name: "50/50 WINDFOR/power-curve blend", c: "var(--ref)", dash: "6 4" },
+  [WX]: { name: "TabPFN, weather only", c: "var(--wx)" },
+  [WX + " frozen"]: { name: "TabPFN, weather only · frozen", c: "var(--wx)", dash: "6 4" },
+  [UP]: { name: "TabPFN upgrade", c: "var(--up)", w: 2.75 },
+  [UP + " frozen"]: { name: "TabPFN upgrade · frozen", c: "var(--up)", dash: "6 4" },
+  ideal: { name: "Perfectly calibrated", c: "var(--muted)", dash: "3 3", w: 1.5 },
+};
+const fmt = (v, d = 0) => Number.isFinite(v) ? v.toLocaleString("en-GB", { maximumFractionDigits: d, minimumFractionDigits: d }) : "—";
+const MW = v => fmt(v) + " MW", pct = v => fmt(100 * v) + "%";
+const sgn = v => (v > 0 ? "+" : v < 0 ? "−" : "") + fmt(Math.abs(v));
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const month = s => MON[+s.slice(5, 7) - 1] + " " + s.slice(2, 4);
+const dayFmt = t => { const d = new Date(t); return `${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][d.getUTCDay()]} ${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+const longDay = t => { const d = new Date(t); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+
+const mk = (tag, a, p) => { const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); p && p.append(e); return e; };
+const swatch = k => `<i class="sw${S[k].dash ? " dash" : ""}" style="--c:${S[k].c}"></i>`;
+const legend = (el, keys, band) => { $(el).innerHTML = keys.map(k => `<span>${swatch(k)}${S[k].name}</span>`).join("") + (band ? `<span><i class="sw fill"></i>Upgrade 10–90%</span>` : ""); };
+const row = (k, v, f = MW) => `<div class="tr">${swatch(k)}<span>${S[k].name}</span><b>${f(v)}</b></div>`;
+const niceStep = (max, n = 4) => { const raw = max / n, p = 10 ** Math.floor(Math.log10(raw)); return [1, 2, 2.5, 5, 10].map(m => m * p).find(s => s >= raw); };
+
+function plot(host, cfg) {
+  host._cfg = cfg;
+  if (!host._ro) { host._ro = new ResizeObserver(() => host.clientWidth !== host._w && render(host)); host._ro.observe(host); }
+  render(host);
+}
+
+function render(host) {
+  const c = host._cfg, W = host._w = host.clientWidth, H = c.h || 280, m = { t: 12, r: 12, b: 30, l: 52 };
+  host.replaceChildren();
+  const svg = mk("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: "plot", role: "img", "aria-label": c.label }, host);
+  const n = c.n, iw = W - m.l - m.r, ih = H - m.t - m.b, X = i => m.l + (n > 1 ? i / (n - 1) : .5) * iw;
+  const vals = c.series.flatMap(s => s.v).concat(c.band ? c.band.hi : []).filter(Number.isFinite);
+  const step = c.step || niceStep(c.yMax ?? Math.max(...vals)), top = c.yMax ?? Math.ceil(Math.max(...vals) / step) * step;
+  const Y = v => m.t + ih - v / top * ih, P = (i, v) => X(i).toFixed(1) + "," + Y(v).toFixed(1);
+  if (c.shade) mk("rect", { x: X(c.shade[0]), y: m.t, width: X(c.shade[1]) - X(c.shade[0]), height: ih, class: "shade" }, svg);
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    mk("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: v ? "grid" : "axis" }, svg);
+    mk("text", { x: m.l - 8, y: Y(v), class: "tick", "text-anchor": "end", "dominant-baseline": "middle" }, svg).textContent = c.yFmt(v);
+  }
+  const minGap = 46; let last = -1e9;
+  for (const i of c.xTicks) { if (X(i) - last < minGap) continue; last = X(i);
+    mk("text", { x: X(i), y: H - 8, class: "tick", "text-anchor": "middle" }, svg).textContent = c.xFmt(i); }
+  if (c.band) {
+    const { lo, hi } = c.band;
+    mk("path", { d: "M" + hi.map((v, i) => P(i, v)).join("L") + "L" + lo.map((v, i) => P(i, v)).reverse().join("L") + "Z", class: "band" }, svg);
+  }
+  for (const s of c.series) {
+    const st = S[s.key]; let d = "", pen = false;
+    s.v.forEach((v, i) => { if (!Number.isFinite(v)) return pen = false; d += (pen ? "L" : "M") + P(i, v); pen = true; });
+    mk("path", { d, fill: "none", stroke: st.c, "stroke-width": st.w || 2, "stroke-dasharray": st.dash || "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, svg);
+    if (c.dots) s.v.forEach((v, i) => Number.isFinite(v) && mk("circle", { cx: X(i), cy: Y(v), r: 4, fill: st.c, stroke: "var(--bg)", "stroke-width": 2 }, svg));
+  }
+  const hair = mk("line", { y1: m.t, y2: m.t + ih, class: "hair", visibility: "hidden" }, svg);
+  const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; host.append(tip);
+  const hit = mk("rect", { x: m.l - 6, y: m.t, width: iw + 12, height: ih, fill: "transparent" }, svg);
+  const move = e => {
+    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - m.l) / iw * (n - 1)))), x = X(i);
+    hair.setAttribute("x1", x); hair.setAttribute("x2", x); hair.setAttribute("visibility", "visible");
+    tip.innerHTML = c.tip(i); tip.hidden = false;
+    const tw = tip.offsetWidth; tip.style.left = Math.max(0, x + 14 + tw > W ? x - 14 - tw : x + 14) + "px"; tip.style.top = m.t + "px";
+  };
+  hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+  hit.addEventListener("pointerleave", () => { hair.setAttribute("visibility", "hidden"); tip.hidden = true; });
+}
+
+// headline numbers
+const sc = Object.fromEntries(D.score.map(r => [r.model, r]));
+const w = sc.windfor, u = sc[UP], gain = -u["ΔMAE"] / w.MAE;
+$("#eyebrow").textContent = `GB wind · day-ahead · held-out ${longDay(Date.parse(D.window[0]))} – ${longDay(Date.parse(D.window[1]))} · frozen at ${D.commit}`;
+$("#dek").textContent = `Every morning NESO publishes WINDFOR, its forecast of tomorrow's GB wind. Fifteen minutes later, TabPFN-3.5 reads that forecast alongside open ECMWF weather and issues its own, using no information NESO didn't have. Over ${D.days} held-out days it cuts NESO's mean absolute error by ${fmt(100 * gain)}%.`;
+$("#kpis").innerHTML = [
+  [`Mean absolute error`, `<span class="neso">${fmt(w.MAE)}</span> → <span class="up">${fmt(u.MAE)}</span> <small>MW</small>`, `WINDFOR vs the TabPFN upgrade, all ${fmt(D.hours)} hours.`],
+  [`Error removed`, `${sgn(u["ΔMAE"])} <small>MW</small>`, `95% interval ${sgn(u.lo)} to ${sgn(u.hi)} MW, bootstrapping whole days.`],
+  [`Days improved`, `${pct(D.better_days)}`, `Days with a lower error than WINDFOR; ${pct(D.better)} of individual hours.`],
+  [`Band coverage`, `${pct(D.coverage[UP])}`, `Hours inside the 10–90% band. A calibrated band holds 80%. WINDFOR has none.`],
+].map(([l, b, p]) => `<div class="kpi"><div class="label">${l}</div><div class="big">${b}</div><p>${p}</p></div>`).join("");
+
+// explorer
+const Hh = D.hourly, T = Hh.t.map(h => h * 3600e3), WK = 168, slider = $("#slider");
+slider.max = T.length - WK;
+let i0 = 0, shade = null;
+legend("#ex-legend", ["y", "windfor", UP], true);
+function week(start, mark) {
+  i0 = Math.max(0, Math.min(T.length - WK, start)); slider.value = i0; shade = mark ?? null;
+  const sl = a => a.slice(i0, i0 + WK), keys = ["windfor", ...($("#show-wx").checked ? [WX] : []), UP, "y"];
+  const col = { y: Hh.y, windfor: Hh.windfor, [WX]: Hh.wx, [UP]: Hh.up };
+  $("#range").textContent = `${dayFmt(T[i0])} – ${dayFmt(T[i0 + WK - 1])} ${new Date(T[i0 + WK - 1]).getUTCFullYear()}`;
+  document.querySelectorAll(".chip").forEach(b => b.setAttribute("aria-pressed", String(shade !== null && +b.dataset.i === shade)));
+  plot($("#ex"), {
+    n: WK, h: 340, label: "Hourly outturn, WINDFOR and TabPFN upgrade for one week",
+    series: keys.map(k => ({ key: k, v: sl(col[k]) })), band: $("#show-band").checked ? { lo: sl(Hh.lo), hi: sl(Hh.hi) } : null,
+    shade: shade === null ? null : [shade - i0, Math.min(WK - 1, shade - i0 + 23)],
+    yFmt: v => fmt(v / 1000) + (v ? "" : " GW"), xTicks: [...Array(WK).keys()].filter(i => new Date(T[i0 + i]).getUTCHours() === 0), xFmt: i => dayFmt(T[i0 + i]),
+    tip: i => { const j = i0 + i, d = new Date(T[j]);
+      return `<div class="when">${dayFmt(T[j])} · ${String(d.getUTCHours()).padStart(2, "0")}:00 UTC</div>` + keys.slice().reverse().map(k => row(k, col[k][j])).join("")
+        + `<div class="tr"><i class="sw fill"></i><span>Upgrade 10–90%</span><b>${fmt(Hh.lo[j])}–${fmt(Hh.hi[j])}</b></div>`; },
+  });
+}
+$("#worst").innerHTML = D.worst.map(r => { const j = T.indexOf(Date.parse(r.day + "T00:00:00Z"));
+  return `<button class="chip" data-i="${j}"><span>${longDay(Date.parse(r.day))}</span><b class="num"><span class="neso">${fmt(r.windfor)}</span> → <span class="up">${fmt(r.up)}</span> MW</b></button>`; }).join("");
+$("#worst").addEventListener("click", e => { const b = e.target.closest(".chip"); if (b) week(+b.dataset.i - 72, +b.dataset.i); });
+$("#prev").onclick = () => week(i0 - WK); $("#next").onclick = () => week(i0 + WK);
+slider.oninput = () => week(+slider.value);
+$("#show-wx").onchange = $("#show-band").onchange = () => week(i0, shade);
+week(T.length - WK);
+
+// scoreboard
+const ORDER = [["windfor", "NESO's day-ahead forecast, the benchmark"], ["windfor debiased", "WINDFOR minus its trailing 28-day mean error (post-hoc reference)"],
+  ["blend", "Fixed 50/50 average with an ECMWF power curve: the bar for any upgrade"], [WX, "ECMWF weather only, no WINDFOR input"],
+  [WX + " frozen", "Context fixed at 2024, never refit"], [UP, "Weather plus WINDFOR as an input, refit monthly"], [UP + " frozen", "Context fixed at 2024, never refit"]];
+const maxMAE = Math.max(...D.score.map(r => r.MAE));
+$("#score").innerHTML = `<thead><tr><th>Forecast</th><th>MAE</th><th>RMSE</th><th>Bias</th><th>vs WINDFOR · 95% interval</th></tr></thead><tbody>` +
+  ORDER.filter(([k]) => sc[k]).map(([k, note]) => { const r = sc[k];
+    return `<tr class="${k === UP ? "hl" : ""}"><td>${swatch(k)} ${S[k].name}<small>${note}</small></td>
+      <td><span class="bar" style="--c:${S[k].c};width:${(60 * r.MAE / maxMAE).toFixed(0)}px"></span>${fmt(r.MAE)}</td><td>${fmt(r.RMSE)}</td><td>${sgn(r.bias)}</td>
+      <td>${k === "windfor" ? "—" : `${sgn(r["ΔMAE"])} <span class="ci">[${sgn(r.lo)}, ${sgn(r.hi)}]</span>`}</td></tr>`; }).join("") + "</tbody>";
+$("#sb-note").textContent = "MW · lower is better";
+const b = sc.blend, db = sc["windfor debiased"];
+$("#sb-text").textContent = `The upgrade beats the fixed blend by ${fmt(b.MAE - u.MAE)} MW and a bias-corrected WINDFOR by ${fmt(db.MAE - u.MAE)} MW, so it is doing more than removing WINDFOR's offset: correcting WINDFOR by its recent bias alone makes it worse. Weather-only TabPFN, which never sees WINDFOR, lands at ${fmt(sc[WX].MAE)} MW.`;
+
+// monthly
+const Mo = D.monthly, moKeys = () => ["windfor", "blend", WX, UP, ...($("#show-frozen").checked ? [WX + " frozen", UP + " frozen"] : [])];
+function monthly() {
+  const keys = moKeys(); legend("#mo-legend", keys);
+  plot($("#mo"), { n: Mo.index.length, h: 300, dots: true, label: "Monthly mean absolute error", series: keys.map(k => ({ key: k, v: Mo[k] })), yMax: null,
+    yFmt: v => fmt(v), xTicks: Mo.index.map((_, i) => i).filter(i => i % 3 === 0), xFmt: i => month(Mo.index[i]),
+    tip: i => `<div class="when">${month(Mo.index[i])} · MAE</div>` + keys.map(k => row(k, Mo[k][i])).join("") });
+}
+$("#show-frozen").onchange = monthly; monthly();
+const wins = Mo.index.filter((_, i) => Mo[UP][i] < Mo.windfor[i]).length;
+$("#mo-text").textContent = `The upgrade beats WINDFOR in ${wins} of ${Mo.index.length} months. Frozen runs keep the 2024 context and are never refit; the gap between dashed and solid lines is what monthly refitting is worth.`;
+
+// lead and level
+const L = D.lead, V = D.level, whKeys = ["windfor", WX, UP];
+legend("#wh-legend", whKeys);
+plot($("#lead"), { n: L.index.length, h: 250, label: "MAE by lead time", series: whKeys.map(k => ({ key: k, v: L[k] })), yFmt: v => fmt(v),
+  xTicks: L.index.map((_, i) => i).filter(i => +L.index[i] % 4 === 0), xFmt: i => L.index[i] + " h",
+  tip: i => `<div class="when">${L.index[i]} h ahead · MAE</div>` + whKeys.map(k => row(k, L[k][i])).join("") });
+plot($("#level"), { n: V.index.length, h: 250, dots: true, label: "MAE by WINDFOR level", series: whKeys.map(k => ({ key: k, v: V[k] })), yFmt: v => fmt(v),
+  xTicks: V.index.map((_, i) => i), xFmt: i => V.index[i],
+  tip: i => `<div class="when">WINDFOR ${V.index[i]} GW · ${fmt(V.n[i])} h</div>` + whKeys.map(k => row(k, V[k][i])).join("") });
+const h = L.index.length / 2 | 0, avg = (k, a, b) => L[k].slice(a, b).reduce((s, v) => s + v, 0) / (b - a), n = L.index.length;
+$("#lead-text").textContent = `${L.index[0]}–${L.index[h - 1]} h ahead: WINDFOR ${fmt(avg("windfor", 0, h))} MW, upgrade ${fmt(avg(UP, 0, h))} MW. ${L.index[h]}–${L.index[n - 1]} h: ${fmt(avg("windfor", h, n))} vs ${fmt(avg(UP, h, n))} MW. The error grows with lead for every forecast; the upgrade keeps a steady margin all the way out.`;
+$("#level-text").textContent = `Grouped by WINDFOR's own forecast (x-axis, GW), which is known at issue, so these groups can be acted on in the control room.`;
+
+// calibration
+const R = D.reliability, nom = [...Array(9)].map((_, i) => (i + 1) / 10), caKeys = [WX, UP];
+legend("#ca-legend", [...caKeys, "ideal"]);
+plot($("#rel"), { n: 9, h: 280, dots: true, yMax: 1, step: .2, label: "Reliability diagram", series: [{ key: "ideal", v: nom }, ...caKeys.map(k => ({ key: k, v: R[k] }))],
+  yFmt: v => fmt(100 * v) + "%", xTicks: [...Array(9).keys()], xFmt: i => "q" + (i + 1) * 10,
+  tip: i => `<div class="when">Predicted decile q${(i + 1) * 10}</div>` + caKeys.map(k => row(k, R[k][i], pct)).join("") + row("ideal", nom[i], pct) });
+const worstDev = Math.max(...R[UP].map((v, i) => Math.abs(v - nom[i])));
+$("#ca-text").textContent = `TabPFN returns a full predictive distribution, not just a number. If it is honest, outturn falls below its 10th percentile 10% of the time, below its median 50% of the time, and so on: the points sit on the dashed diagonal. For the upgrade, the largest miss is ${fmt(100 * worstDev)} percentage points, and its 10–90% band holds ${pct(D.coverage[UP])} of hours against a target of 80%. That turns a single number into a range the control room can plan reserve against.`;
+$("#me-test").textContent = `${longDay(Date.parse(D.window[0]))} to ${longDay(Date.parse(D.window[1]))}, ${fmt(D.days)} days and ${fmt(D.hours)} hours, scored once. The protocol, features and model were frozen in git commit ${D.commit} before any 2025 score was computed; everything was developed on 2024 only. Monthly refits use only hours settled a day before issue.`;
+</script>

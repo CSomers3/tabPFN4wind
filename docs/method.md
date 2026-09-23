@@ -18,7 +18,7 @@ Known gap: self-curtailment at negative prices (via physical notifications) is n
 In backtests the target is never a feature. BOAV is published ~1 h after each half-hour live, but archived rows carry createdDateTime ≈ startTime + 25 h, so their historical availability cannot be shown.
 
 ## Model (`windpfn/model.py`)
-- TabPFN-3.5 (`tabpfn-client`, `v3.5` default checkpoint), predictive median. Target `y / cap`, rescaled by `cap`.
+- TabPFN-3.5 (`tabpfn-client`, `v3.5` default checkpoint), predictive median (the full deciles are saved for diagnostics). Target `y / cap`, rescaled by `cap`.
 - Features (`model.features`): power-curve capacity factor and sin/cos of 100 m wind direction at the 20 points, `cap`, `lead_h`, `hour`, `doy_sin`, `doy_cos`. Claim (b) adds `windfor`.
 - Context: every hour with valid_time ≤ (first issue of the month − 1 day), expanding, refit monthly. The 1-day embargo covers the unverifiable BOAV timing. The `frozen` variant keeps the context of the first test month throughout, isolating the value of refitting.
 

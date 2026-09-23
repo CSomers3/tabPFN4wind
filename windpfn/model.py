@@ -7,6 +7,7 @@ from .dataset import WD, WS
 
 EMBARGO = pd.Timedelta(days=1)  # archived BOAV cannot show when curtailment was known; train only on settled hours
 TIME = ["cap", "lead_h", "hour", "doy_sin", "doy_cos"]
+Q = [.1, .2, .3, .4, .5, .6, .7, .8, .9]
 
 
 def features(d: pd.DataFrame) -> pd.DataFrame:
@@ -16,12 +17,14 @@ def features(d: pd.DataFrame) -> pd.DataFrame:
                       np.sin(wd).add_prefix("sin_"), np.cos(wd).add_prefix("cos_"), d[TIME]], axis=1)
 
 
-def fit_predict(X: pd.DataFrame, d: pd.DataFrame, train, test) -> pd.Series:
+def fit_predict(X: pd.DataFrame, d: pd.DataFrame, train, test) -> pd.DataFrame:
+    """Predictive deciles q10..q90 (MW); q50 is the point forecast."""
     m = TabPFNRegressor.create_default_for_version("v3.5").fit(X[train], (d.y / d.cap)[train])
-    return pd.Series(m.predict(X[test], output_type="median") * d.cap[test].to_numpy(), d.index[test])
+    q = np.column_stack(m.predict(X[test], output_type="quantiles", quantiles=Q)) * d.cap[test].to_numpy()[:, None]
+    return pd.DataFrame(q, d.index[test], [f"q{p * 100:.0f}" for p in Q])
 
 
-def backtest(X: pd.DataFrame, d: pd.DataFrame, start, end=None, refit=True) -> pd.Series:
+def backtest(X: pd.DataFrame, d: pd.DataFrame, start, end=None, refit=True) -> pd.DataFrame:
     """Forecast [start, end]. Context: hours settled by the first issue (less EMBARGO); refit monthly or frozen."""
     t = d.index.to_series()[start:end]
     blocks = [g.index for _, g in t.groupby(t.dt.strftime("%Y-%m"))] if refit else [t.index]

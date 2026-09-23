@@ -1,0 +1,21 @@
+point,lat,lon,mw,n,top
+off_00,53.177,0.702,3043.0,10,Triton Knoll
+off_01,56.543,-2.005,1713.0,5,Seagreen
+off_02,54.138,-3.515,1891.0,9,Walney 3
+off_03,55.967,1.668,2400.0,1,Dogger Bank A & B (was Creyke Beck A & B)
+off_04,51.833,1.787,2885.0,11,East Anglia 1 (EA 1)
+off_05,58.029,-2.999,2460.0,5,Moray East
+off_06,53.826,1.483,2538.0,2,Hornsea 2 - Optimus and Breesea
+off_07,55.21,2.33,1400.0,1,Sofia (Teesside B)
+off_08,50.64,-0.18,400.0,1,Rampion Offshore Wind Farm (Hastings Zone)
+off_09,53.455,-3.495,1074.0,5,Gwynt y Mor
+on_10,52.237,-0.001,646.0,38,Little Cheyne Court Wind Farm
+on_11,58.331,-3.816,883.0,24,Creag Riabhach Wind Farm
+on_12,55.583,-3.846,3076.0,62,Clyde Wind Farm
+on_13,51.507,-3.88,753.0,23,Pen Y Cymoedd
+on_14,53.815,-1.164,896.0,43,Keadby Wind Farm
+on_15,57.264,-3.958,2292.0,50,Stronelairg Wind Farm
+on_16,60.339,-1.208,443.0,1,Viking Wind Farm
+on_17,52.812,-3.5,515.0,19,Clocaenog Forest Wind Farm
+on_18,55.731,-2.476,1221.0,34,Fallago Rig
+on_19,55.334,-4.715,1950.0,41,South Kyle Wind Farm

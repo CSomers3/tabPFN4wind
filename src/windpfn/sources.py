@@ -115,6 +115,16 @@ def windfor(start="2016-01-01", end=None) -> pd.DataFrame:
     return vintages.assign(publishTime=_utc(vintages.publishTime), startTime=_utc(vintages.startTime))
 
 
+def newest_windfor() -> pd.Timestamp:
+    """publishTime of the newest WINDFOR vintage, uncached."""
+    now = pd.Timestamp.now("UTC")
+    params = {
+        "publishDateTimeFrom": f"{now - pd.Timedelta(hours=12):%Y-%m-%dT%H:%MZ}",
+        "publishDateTimeTo": f"{now + pd.Timedelta(hours=1):%Y-%m-%dT%H:%MZ}",
+    }
+    return _utc([row["publishTime"] for row in request(f"{DATASETS}/WINDFOR/stream", params=params).json()]).max()
+
+
 def _fuelhh(start, end, **params) -> pd.DataFrame:
     """FUELHH rows, keeping the latest publication of each (startTime, fuelType).
 

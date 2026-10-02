@@ -5,7 +5,8 @@
     windpfn-backtest    regenerate held-out forecasts into data/results/
     windpfn-score       print the held-out scorecard from the committed forecasts, offline
     windpfn-page        export the data behind notebooks/explorer.py into notebooks/public/
-    windpfn-live        issue the full distribution after NESO's newest update, into notebooks/public/live.csv
+    windpfn-live        issue the full distribution after NESO's newest update, into notebooks/public/live.csv,
+                        from data/history/ and what has been published since
 """
 
 from __future__ import annotations
@@ -212,15 +213,18 @@ def live() -> None:
 
     Run after each of NESO's eight daily vintages; a vintage already issued is skipped. Hours not
     yet started take the new forecast, and started hours keep the last one issued before them, so
-    each row is the most recent forecast for its hour. Needs the raw pulls and a tabpfn-client token.
+    each row is the most recent forecast for its hour. The context is data/history/ plus everything
+    published since, pulled into data/raw/. Needs a tabpfn-client token.
     """
     _parser(live.__doc__).parse_args()
-    table = dataset.vintages(sources.ARCHIVE_START)
-    issue = table.issue_time.max()
     record = pd.read_csv(LIVE, index_col="hour", parse_dates=["hour", "issue_time"]) if LIVE.exists() else None
-    if record is not None and record.issue_time.max() >= issue.tz_convert(None):
-        print(f"vintage {issue - dataset.PUBLICATION_LAG:%Y-%m-%d %H:%M} UTC already issued")
+    newest = sources.newest_windfor()
+    if record is not None and record.issue_time.max() >= (newest + dataset.PUBLICATION_LAG).tz_convert(None):
+        print(f"NESO's {newest:%Y-%m-%d %H:%M} UTC update already issued")
         return
+
+    table = dataset.vintages(sources.ARCHIVE_START, inputs=dataset.update(dataset.load(dataset.HISTORY)))
+    issue = table.issue_time.max()
 
     inputs = forecasting.features(table).assign(
         windfor=table.windfor.to_numpy(), metered_now=table.metered_now.to_numpy()
@@ -238,4 +242,4 @@ def live() -> None:
     columns = ["windfor", *forecasting.quantile_columns(forecasting.PERCENTILES)]
     issued = issued.astype({column: "int64" for column in columns}).rename_axis("hour")
     issued.to_csv(LIVE, date_format="%Y-%m-%d %H:%M")
-    print(f"issued vintage {issue - dataset.PUBLICATION_LAG:%Y-%m-%d %H:%M} UTC")
+    print(f"Forecast from NESO's {issue - dataset.PUBLICATION_LAG:%Y-%m-%d %H:%M} UTC update")

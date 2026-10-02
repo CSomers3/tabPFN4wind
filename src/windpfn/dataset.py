@@ -4,7 +4,8 @@ A forecast is issued PUBLICATION_LAG after a NESO WINDFOR vintage is published, 
 the newest AIFS run public by then, and the last half-hour of metered wind published by then.
 `vintages` holds every vintage; `build` keeps, for each delivery day D, the latest vintage published
 by D-1 08:30Z. `check` enforces the timing on every table. Both take their inputs from `pull`,
-or from a folder written by `save`, such as the sample in data/sample/.
+or from a folder written by `save`: the sample in data/sample/, or the full history in data/history/
+that `update` brings up to date for the live forecast.
 """
 
 from __future__ import annotations
@@ -24,7 +25,9 @@ COVARIATES = ["cap", "lead_h", "hour", "doy_sin", "doy_cos"]
 
 SAMPLE = sources.DATA / "sample"
 SAMPLE_START, SAMPLE_END, SAMPLE_TEST_START = "2026-03-01", "2026-09-15", "2026-08-01"
+HISTORY = sources.DATA / "history"
 FOLDERS = {"windfor": "bmrs", "metered": "bmrs", "curtailment": "bmrs", "capacity": "bmrs", "aifs": "weather"}
+KEYS = {"windfor": ["publishTime", "startTime"], "aifs": ["init_time", "lead_time", "point"]}
 
 
 def hourly(half_hourly: pd.Series) -> pd.Series:
@@ -76,6 +79,19 @@ def load(folder: Path = SAMPLE) -> dict:
         name: pd.read_parquet(folder / FOLDERS[name] / f"{name}.parquet").squeeze("columns")
         for name in FOLDERS
     }
+
+
+def update(inputs: dict) -> dict:
+    """`inputs` brought up to now, pulling again from a week before they end, while the APIs may revise."""
+    fresh = pull(inputs["metered"].index.max().tz_convert(None).normalize() - sources.REVISABLE)
+    merged = {}
+    for name, old in inputs.items():
+        both = pd.concat([old, fresh[name]])
+        if name in KEYS:
+            merged[name] = both.drop_duplicates(KEYS[name], keep="last")
+        else:
+            merged[name] = both[~both.index.duplicated(keep="last")].sort_index()
+    return merged
 
 
 def vintages(start=sources.ARCHIVE_START, end=None, inputs: dict | None = None) -> pd.DataFrame:

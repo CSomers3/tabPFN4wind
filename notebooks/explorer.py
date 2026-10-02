@@ -15,6 +15,7 @@ app = marimo.App(width="medium", app_title="GB wind · TabPFN-3.5")
 @app.cell(hide_code=True)
 def _():
     import asyncio
+    import io
     import json
     import sys
     import urllib.request
@@ -24,15 +25,24 @@ def _():
     import numpy as np
     import pandas as pd
 
-    return asyncio, json, mo, np, pd, sys, urlencode, urllib
+    return asyncio, io, json, mo, np, pd, sys, urlencode, urllib
 
 
 @app.cell(hide_code=True)
-def _(mo, pd):
+async def _(io, json, mo, pd, sys):
     # Written by `windpfn-page` and `windpfn-live`: windpfn itself can't be installed under Pyodide.
+    # Read as text first: pandas would gunzip what the browser has already decompressed.
     public = mo.notebook_location() / "public"
-    meta = pd.read_json(str(public / "meta.json"), typ="series")
-    live = pd.read_csv(str(public / "live.csv"), index_col="hour", parse_dates=["hour", "issue_time"])
+
+    async def read(name: str) -> str:
+        if sys.platform == "emscripten":
+            from pyodide.http import pyfetch
+
+            return await (await pyfetch(str(public / name))).string()
+        return (public / name).read_text(encoding="utf-8")
+
+    meta = pd.Series(json.loads(await read("meta.json")))
+    live = pd.read_csv(io.StringIO(await read("live.csv")), index_col="hour", parse_dates=["hour", "issue_time"])
     return live, meta
 
 

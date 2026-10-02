@@ -58,7 +58,7 @@ predicted = model.predict(features[test], output_type="quantiles", quantiles=qua
 
 ## Live
 
-`windpfn-live` runs after each NESO update. It issues TabPFN-3.5's p1–p99 for every hour of the newest WINDFOR vintage into `notebooks/public/live.csv`. The page, [notebooks/explorer.py](notebooks/explorer.py), is deployed to GitHub Pages on each push to that file and pulls outturn from Elexon on load. The committed forecasts run to the end of 26 September 2026.
+`windpfn-live` runs after each NESO update. It issues TabPFN-3.5's p1–p99 for every hour of the newest WINDFOR vintage into `notebooks/public/live.csv`. The [live page](https://csomers3.github.io/tabPFN4wind/), [notebooks/explorer.py](notebooks/explorer.py), is deployed to GitHub Pages on each push to that file and pulls outturn from Elexon on load. The committed forecasts run to the end of 26 September 2026.
 
 ![A still of the live page: outturn since yesterday, then TabPFN-3.5's p1–p99 distribution and NESO's forecast from the last settled hour to the end of tomorrow](notebooks/live.png)
 

@@ -42,7 +42,7 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## LightGBM settings, chosen by CRPS on Apr–Dec 2024 (`forecasting.LGBM_PARAMS` holds the winner)
+    ## LightGBM settings, chosen by CRPS on Jul–Dec 2024 (`forecasting.LGBM_PARAMS` holds the winner)
     """)
     return
 
@@ -56,7 +56,7 @@ def _(dataset, evaluation, forecasting, partial):
         for leaves in (7, 15, 31)
         for trees, rate in ((300, 0.05), (1000, 0.02))
     ]
-    _window = ("2024-04-01", "2024-12-31")
+    _window = ("2024-07-01", "2024-12-31")
     _runs = {
         str(settings): forecasting.backtest(
             _inputs, table, *_window, forecaster=partial(forecasting.lightgbm, **settings)

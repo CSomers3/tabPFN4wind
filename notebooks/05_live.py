@@ -17,7 +17,7 @@ def _(mo):
     # 05 · Live
 
     A still of the live page's chart (`explorer.py`), drawn the same way: outturn since
-    yesterday under the forecasts from TabPFN-3.5 (its p10–p90 to p40–p60 fan and median)
+    yesterday under the forecasts from TabPFN-3.5 (its fan of p10–p90 to p40–p60 and its median)
     and NESO, each hour from the last update issued before it, to the end of tomorrow. Reads
     `notebooks/public/live.csv` and pulls outturn from Elexon.
 
@@ -32,6 +32,7 @@ def _():
 
     from windpfn import cli, dataset, sources, style
 
+    style.use()
     return cli, dataset, pd, sources, style
 
 
@@ -52,7 +53,9 @@ def _(live, now, observed, pd, sources, start, style):
     _issued = live.dropna(subset=["q50"])
     _hours = pd.date_range(start, min(start + pd.Timedelta(hours=71), _issued.index[-1]), freq="h")
     _forecast = _issued.drop(columns="issue_time").reindex(_hours) / 1e3
-    style.fan_chart(_forecast, _forecast.windfor, observed / 1e3, now, path=sources.ROOT / "notebooks" / "live.png")
+    figure = style.fan_chart(_forecast, _forecast.windfor, observed / 1e3, now)
+    figure.savefig(sources.ROOT / "notebooks" / "live.png")
+    figure
     return
 
 

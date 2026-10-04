@@ -56,24 +56,23 @@ git clone https://github.com/CSomers3/tabPFN4wind && cd tabPFN4wind
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[tabpfn,notebooks]"
 
-windpfn-score     # the results table, offline, from the committed forecasts
-windpfn-sample    # the whole pipeline on a bundled six-month sample, offline, in about a minute
+windpfn-score                     # the results table above, offline, from the committed forecasts
+marimo edit notebooks/sample.py   # the whole pipeline on a bundled six-month sample, in about a minute
 ```
 
-TabPFN-3.5 runs on Prior Labs' hosted API. To include it, set a token from a Prior Labs account: `export TABPFN_TOKEN=<token>` (PowerShell: `$env:TABPFN_TOKEN = "<token>"`), then run `windpfn-sample --tabpfn`. The sample's context is months, not years, so its scores are a smoke test, not a result.
+The sample runs offline with the two references. TabPFN-3.5 runs on Prior Labs' hosted API: to include it, set a token from a Prior Labs account before starting marimo, `export TABPFN_TOKEN=<token>` (PowerShell: `$env:TABPFN_TOKEN = "<token>"`). The sample's context is months, not years, so its scores are a smoke test, not a result.
+
+The notebooks read only from the five modules in [src/windpfn/](src/windpfn): `sources`, `weather`, `dataset`, `forecasting` and `evaluation`.
 
 | | |
 |---|---|
-| `marimo edit notebooks/sample.py` | `windpfn-sample` as a notebook: inputs, forecasts, scores and any week's chart |
-| `marimo edit notebooks/03_test.py` | held-out results and figures, offline |
-| `marimo edit notebooks/02_development.py` | the 2024 development runs and the Prior Labs configuration study (token) |
-| `marimo run notebooks/explorer.py` | the live page, locally |
-| `windpfn-live` | issue p1–p99 from NESO's newest update (token) |
-| `windpfn-backtest tabpfn` | regenerate TabPFN's held-out forecasts (raw pulls and a token) |
-| `windpfn-backtest references` | regenerate LightGBM's and the conformal band's |
-| `windpfn-fetch` | pull every raw input into `data/raw/`, each logged with its URL and sha256 |
+| [`01_data`](notebooks/01_data.py) | the information set, the target, the benchmark and the cost of NESO's error (raw pulls) |
+| [`02_development`](notebooks/02_development.py) | the 2024 development runs and the test of Prior Labs' guidance (token) |
+| [`03_test`](notebooks/03_test.py) | the held-out results and the README figures, offline |
+| [`04_references`](notebooks/04_references.py) | LightGBM's tuning and the reference scores |
+| [`05_live`](notebooks/05_live.py) | the live chart; [`explorer`](notebooks/explorer.py) is the live page itself |
 
-The pipeline is five modules in [src/windpfn/](src/windpfn): `sources`, `weather`, `dataset`, `forecasting` and `evaluation`. The notebooks only read from it.
+`windpfn-fetch` pulls every raw input into `data/raw/`, each logged with its URL and sha256. `windpfn-backtest tabpfn` and `windpfn-backtest references` regenerate the held-out forecasts, and `windpfn-live` issues p1–p99 from NESO's newest update (token).
 
 ## Data
 

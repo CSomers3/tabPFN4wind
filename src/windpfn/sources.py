@@ -55,11 +55,6 @@ def write_atomic(path: Path, body: bytes) -> None:
     partial.replace(path)
 
 
-def append_jsonl(path: Path, records: list[dict]) -> None:
-    with _APPEND_LOCK, path.open("a") as log:
-        log.writelines(json.dumps(record) + "\n" for record in records)
-
-
 def get_json(source: str, url: str, params: dict | None = None, refresh: bool = False):
     """A cached GET. Pass `refresh` for windows the API may still revise or extend."""
     full_url = url + ("?" + urlencode(sorted(params.items())) if params else "")
@@ -78,7 +73,8 @@ def get_json(source: str, url: str, params: dict | None = None, refresh: bool = 
         "sha256": hashlib.sha256(body).hexdigest(),
         "bytes": len(body),
     }
-    append_jsonl(RAW / "manifest.jsonl", [record])
+    with _APPEND_LOCK, (RAW / "manifest.jsonl").open("a") as log:
+        log.write(json.dumps(record) + "\n")
     return json.loads(body)
 
 
@@ -240,15 +236,6 @@ def issue_times(vintages: pd.DataFrame, start, end=None, cutoff=ISSUE_CUTOFF) ->
     return issues[: _utc(end)] if end else issues
 
 
-def day_ahead_vintage(vintages: pd.DataFrame, cutoff=ISSUE_CUTOFF) -> pd.DataFrame:
-    """For each hour, the latest vintage published by D-1 cutoff, keeping future hours only."""
-    ahead = vintages[vintages.startTime > vintages.publishTime]
-    day = ahead.startTime.dt.floor("D")
-    ahead = ahead[ahead.publishTime <= day - pd.Timedelta(days=1) + cutoff]
-    latest = ahead.sort_values("publishTime").drop_duplicates("startTime", keep="last")
-    return latest.set_index("startTime")
-
-
 def wind_units() -> pd.Series:
     """Nameplate MW of transmission wind BM units (T_, E_). A current snapshot, undated."""
     units = pd.DataFrame(get_json("bmunits", f"{ELEXON}/reference/bmunits/all"))
@@ -278,29 +265,3 @@ def capacity(end=None) -> pd.Series:
     known_from = (first_output(end=end) + B1610_LAG).sort_values()
     steps = pd.Series(wind_units()[known_from.index].cumsum().to_numpy(), pd.DatetimeIndex(known_from))
     return steps.groupby(level=0).last().rename("capacity")
-
-
-def poll_windfor_latency(hours: float = 3.0, out: Path = DATA / "audit/windfor_first_seen.jsonl"):
-    """Log when each WINDFOR publishTime first appears on the API.
-
-    One try per poll, so a slow response is never stamped late.
-    """
-    stop, seen = pd.Timestamp.now("UTC") + pd.Timedelta(hours=hours), set()
-    while (now := pd.Timestamp.now("UTC")) < stop:
-        params = {
-            "publishDateTimeFrom": f"{now - pd.Timedelta(hours=12):%Y-%m-%dT%H:%MZ}",
-            "publishDateTimeTo": f"{now + pd.Timedelta(hours=2):%Y-%m-%dT%H:%MZ}",
-        }
-        try:
-            response = request(f"{DATASETS}/WINDFOR/stream", tries=1, params=params)
-            published = {row["publishTime"] for row in response.json()}
-        except requests.RequestException as error:
-            print("error", error, flush=True)
-            published = set()
-        records = [
-            {"publishTime": stamp, "first_seen_utc": now.isoformat(timespec="seconds"), "initial": not seen}
-            for stamp in sorted(published - seen)
-        ]
-        append_jsonl(out, records)
-        seen |= published
-        time.sleep(120)

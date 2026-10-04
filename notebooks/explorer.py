@@ -176,6 +176,13 @@ def _(np):
     .inputs li {{ margin-bottom: 6px; }}
     .inputs b {{ color: {P["ink"]}; font-weight: 600; }}
     .inputs .map text {{ font: 11px {FONT}; fill: {P["muted"]}; }}
+    .scores {{ flex: 0 1 560px; width: 100%; height: auto; font: 12px {FONT}; font-variant-numeric: tabular-nums; }}
+    .scores text {{ fill: {P["ink2"]}; }}
+    .scores text.head {{ fill: {P["ink"]}; font-weight: 600; }}
+    .scores text.ours {{ fill: {P["ink"]}; font-weight: 600; }}
+    .scores text.value {{ fill: {P["ink"]}; }}
+    .scores text.note {{ fill: {P["muted"]}; font-size: 10.5px; }}
+    .inputs .text p + p {{ margin-top: 10px; }}
     .credit {{ color: {P["muted"]}; font-size: 12px; margin-top: 12px; }}
     """
     return CSS, P, shade
@@ -346,7 +353,35 @@ def _(P, np, pd, shade):
         out.append(f'<text x="{W - 86}" y="{54}">wind farm</text>')
         return f'<svg class="map" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
 
-    return chart, sites
+    def scores(meta, W: int = 560) -> str:
+        """Held-out mean error and p10–p90 coverage, TabPFN-3.5 against NESO and the two baselines."""
+        label, panel, gap, row, top = 150, 170, 40, 30, 30
+        mae_x, cover_x = label, label + panel + gap
+        bottom = top + row * len(meta.scores)
+        H = bottom + 16
+        colours = {"NESO": P["incumbent"], "NESO + conformal band": P["incumbent"], "TabPFN-3.5": P["accent"]}
+        out = [f'<text x="{mae_x}" y="12" class="head">Mean error, MW</text>',
+               f'<text x="{cover_x}" y="12" class="head">Hours inside p10–p90</text>']
+        target = cover_x + 0.8 * panel
+        out.append(f'<line x1="{target:.1f}" x2="{target:.1f}" y1="{top}" y2="{bottom}" stroke="{P["ink2"]}" '
+                   f'stroke-dasharray="3 3"/>')
+        out.append(f'<text x="{target:.1f}" y="{H - 2}" text-anchor="middle" class="note">80% target</text>')
+        for k, (name, mae, cover) in enumerate(meta.scores):
+            y, colour = top + row * k, colours.get(name, P["faint"])
+            weight = ' class="ours"' if name == "TabPFN-3.5" else ""
+            out.append(f'<text x="0" y="{y + 15}"{weight}>{name}</text>')
+            width = mae / 1200 * panel
+            out.append(f'<rect x="{mae_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
+            out.append(f'<text x="{mae_x + width + 6:.1f}" y="{y + 15}" class="value">{mae:,}</text>')
+            if cover is None:
+                out.append(f'<text x="{cover_x}" y="{y + 15}" class="note">point forecast only</text>')
+                continue
+            width = cover * panel
+            out.append(f'<rect x="{cover_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
+            out.append(f'<text x="{W}" y="{y + 15}" text-anchor="end" class="value">{cover:.0%}</text>')
+        return f'<svg class="scores" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
+
+    return chart, scores, sites
 
 
 @app.cell(hide_code=True)
@@ -388,6 +423,28 @@ def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
 
 
 @app.cell(hide_code=True)
+def _(meta, mo, scores):
+    _lgbm = dict((name, (mae, cover)) for name, mae, cover in meta.scores)["LightGBM, tuned"]
+    mo.Html(f"""
+    <div class="page inputs">
+      {scores(meta)}
+      <div class="text">
+        <p class="subhead">Held out: {meta.days} days of day-ahead forecasts, 2025–26</p>
+        <p>TabPFN-3.5's median missed by <b>{meta.mae:,.0f} MW</b> on average, against
+        {meta.mae_windfor:,.0f} MW for NESO's. A LightGBM tuned on 2024 with the same inputs comes
+        within {_lgbm[0] - meta.mae:,.0f} MW, but its p10–p90 holds only {_lgbm[1]:.0%} of hours.
+        TabPFN-3.5's holds <b>{meta.cover80:.0%}</b> with no calibration step.</p>
+        <p>NESO balances what its forecast misses close to real time, at a cost of £2.3bn in 2025.
+        WINDFOR missed by 9.4 TWh that year; at the gap between imbalance and day-ahead prices,
+        cutting the miss by a tenth is worth about £20m a year. TabPFN-3.5's was 10.7% smaller,
+        and its p10–p90 says how far tomorrow could miss by.</p>
+      </div>
+    </div>
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(meta, mo, sites):
     mo.Html(f"""
     <div class="page inputs">
@@ -398,12 +455,9 @@ def _(meta, mo, sites):
           <li>NESO's forecast, fifteen minutes after each of its updates.</li>
           <li>ECMWF AIFS's newest 10 m wind at the <b>20 points</b> on the map, each the
           capacity-weighted centre of the wind farms around it.</li>
-          <li>Every settled hour of outturn since March 2024, read in context: TabPFN-3.5 is
-          not trained or tuned for this.</li>
+          <li>Every settled hour of outturn since April 2024, as context. TabPFN-3.5 is not
+          trained or tuned for this: each forecast is one forward pass.</li>
         </ol>
-        <p>Over <b>{meta.days} held-out days</b> of day-ahead forecasts, TabPFN-3.5's median
-        missed by <b>{meta.mae:,.0f} MW</b> on average, against {meta.mae_windfor:,.0f} MW for
-        NESO's, and <b>{meta.cover80:.0%}</b> of hours fell between its p10 and p90.</p>
         <p class="credit">Outturn is metered transmission wind plus balancing-mechanism curtailment,
         hour ending · Data: Elexon BMRS, ECMWF AIFS via dynamical.org (CC BY 4.0), REPD (OGL v3.0) ·
         Protocol frozen at {meta.freeze}</p>

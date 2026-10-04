@@ -24,6 +24,12 @@ RESULTS = sources.DATA / "results"
 PUBLIC = sources.ROOT / "notebooks/public"
 LIVE = PUBLIC / "live.csv"
 TABPFN = "tabpfn+windfor"
+BASELINES = {
+    "windfor": "NESO",
+    "conformal": "NESO + conformal band",
+    "lgbm+windfor": "LightGBM, tuned",
+    TABPFN: "TabPFN-3.5",
+}
 
 
 def _parser(description: str) -> argparse.ArgumentParser:
@@ -168,13 +174,13 @@ def score() -> None:
 def page() -> None:
     """Export the data behind notebooks/explorer.py, which runs under Pyodide without windpfn.
 
-    Writes notebooks/public/meta.json: the held-out headline scores, the wind units whose
+    Writes notebooks/public/meta.json: the held-out scores against the baselines, the wind units whose
     curtailment the page adds to live outturn, and the map of wind farms and weather points.
     `windpfn-live` writes live.csv beside it.
     """
     _parser(page.__doc__).parse_args()
     forecasts = evaluation.load_forecasts()
-    _, _, scores = evaluation.scorecard(forecasts, [TABPFN])
+    _, _, scores = evaluation.scorecard(forecasts, list(BASELINES)[1:])
 
     countries = sources.get_json("naturalearth", weather.NATURAL_EARTH)["features"]
     outline = [
@@ -194,6 +200,10 @@ def page() -> None:
         "mae": tabpfn.MAE,
         "mae_windfor": windfor.MAE,
         "cover80": round(tabpfn.cover80, 4),
+        "scores": [
+            [label, round(scores.MAE[name]), None if pd.isna(scores.cover80[name]) else round(scores.cover80[name], 3)]
+            for name, label in BASELINES.items()
+        ],
         "units": sorted(sources.wind_units().index),
         "outline": outline,
         "farms": [[round(x, 3), round(y, 3), round(mw)] for x, y, mw in zip(lon, lat, farms.mw)],

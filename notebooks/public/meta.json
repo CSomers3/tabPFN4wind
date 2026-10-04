@@ -4,6 +4,28 @@
  "mae": 912.0,
  "mae_windfor": 1022.0,
  "cover80": 0.8056,
+ "scores": [
+  [
+   "NESO",
+   1022,
+   null
+  ],
+  [
+   "NESO + conformal band",
+   1004,
+   0.792
+  ],
+  [
+   "LightGBM, tuned",
+   929,
+   0.672
+  ],
+  [
+   "TabPFN-3.5",
+   912,
+   0.806
+  ]
+ ],
  "units": [
   "E_ABRTW-1",
   "E_AIRSW-1",

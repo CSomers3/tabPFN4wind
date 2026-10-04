@@ -30,13 +30,34 @@ MW, lower is better; coverage targets 80%. ΔMAE vs WINDFOR: −109 MW (−10.7%
 
 ## Quick start
 
-```bash
-git clone https://github.com/CSomers3/tabPFN4wind && cd tabPFN4wind
-pip install -e .
-windpfn-sample            # forecast Aug–Sep 2026 from the bundled sample, offline, about a minute
-windpfn-sample --tabpfn   # add TabPFN-3.5 (pip install -e ".[tabpfn]", Prior Labs account)
-windpfn-score             # the results table above, from the committed held-out forecasts
-```
+Python 3.12 or later.
+
+1. Install, with the TabPFN client:
+
+   ```bash
+   git clone https://github.com/CSomers3/tabPFN4wind && cd tabPFN4wind
+   python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+   pip install -e ".[tabpfn]"
+   ```
+
+2. Run the pipeline on the bundled sample, offline. It forecasts Aug–Sep 2026 with LightGBM and the conformal band, in under a minute:
+
+   ```bash
+   windpfn-sample
+   ```
+
+3. Add TabPFN-3.5. It runs on Prior Labs' hosted API, so it needs a token from a Prior Labs account:
+
+   ```bash
+   export TABPFN_TOKEN=<your token>   # PowerShell: $env:TABPFN_TOKEN = "<your token>"
+   windpfn-sample --tabpfn
+   ```
+
+4. Rebuild the results table above from the committed held-out forecasts:
+
+   ```bash
+   windpfn-score
+   ```
 
 `windpfn-sample` runs the full pipeline on six months of recent inputs in [data/sample/](data/sample): it builds the point-in-time table, then forecasts each month from every hour settled a day before it. Its context is far shorter than the backtest's, so its scores are a smoke test, not a result.
 

@@ -75,11 +75,12 @@ def _to_mw(capacity_factor: np.ndarray, table: pd.DataFrame, test, quantiles=QUA
     return pd.DataFrame(megawatts, table.index[test], quantile_columns(quantiles))
 
 
-def tabpfn(features, table, train, test) -> pd.DataFrame:
-    """TabPFN-3.5 with the `train` rows as its context, predicting capacity factor."""
+def tabpfn(features, table, train, test, **settings) -> pd.DataFrame:
+    """TabPFN-3.5 with the `train` rows as its context, predicting capacity factor. `settings`
+    go to the client's TabPFNRegressor; the held-out runs used none."""
     from tabpfn_client import TabPFNRegressor  # optional extra; needs an API token
 
-    model = TabPFNRegressor.create_default_for_version("v3.5")
+    model = TabPFNRegressor.create_default_for_version("v3.5", **settings)
     model.fit(features[train], (table.y / table.cap)[train])
     deciles = model.predict(features[test], output_type="quantiles", quantiles=QUANTILES)
     return _to_mw(np.column_stack(deciles), table, test)

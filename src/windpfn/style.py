@@ -10,6 +10,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from matplotlib import font_manager
 
 PALETTE = {
@@ -38,10 +41,12 @@ PAPER = {  # notebooks/explorer.py's palette, so the README figures match the li
     "incumbent": "#C2255C",
     "forecast": "#3E7AC4",
     "median": "#1F5FAD",
-    "p10_p90": "#D4E2F5",
-    "p25_p75": "#A3C1E8",
+    "fan": ["#DCE7F4", "#C1D4EC", "#A6C2E4", "#8BAFDC"],
     "gap": "#E4EDF9",
 }
+
+FAN = ((10, 90), (20, 80), (30, 70), (40, 60))  # central intervals, outermost first, shaded deeper inward
+LABELLED = (90, 70, 50, 30, 10)
 
 PX = 0.75  # CSS px -> pt
 
@@ -142,15 +147,16 @@ def paper():
 
 
 class Fan:
-    """Legend handle for the predictive distribution: the page's p10–p90 and p25–p75 bands and median."""
+    """Legend handle for the predictive distribution: the page's nested central intervals and median."""
 
 
 class _FanHandler:
     def legend_artist(self, legend, handle, fontsize, box):
         middle, half = box.ydescent + box.height / 2, box.height * 0.75
-        for key, height in (("p10_p90", half), ("p25_p75", half * 0.55)):
+        for k, colour in enumerate(PAPER["fan"]):
+            height = half * (1 - k / len(FAN))
             box.add_artist(mpl.patches.Rectangle(
-                (box.xdescent, middle - height), box.width, 2 * height, facecolor=PAPER[key], lw=0,
+                (box.xdescent, middle - height), box.width, 2 * height, facecolor=colour, lw=0,
             ))
         box.add_artist(mpl.lines.Line2D(
             [box.xdescent, box.xdescent + box.width], [middle, middle], color=PAPER["median"], lw=1.4,
@@ -168,3 +174,59 @@ def header(ax, unit: str, handles=(), labels=(), y: float = 1.04) -> None:
 
 def line(colour: str, width: float = 1.1):
     return mpl.lines.Line2D([], [], color=colour, lw=width)
+
+
+def fan_chart(forecast: pd.DataFrame, incumbent: pd.Series, observed: pd.Series, now=None,
+              label: str = "TabPFN-3.5", path: Path | None = None):
+    """The live page's chart, in GW: outturn under the forecast's fan and median, and NESO's forecast.
+
+    `forecast` holds q10..q90 on an hourly index. With `now`, the hours before it are shaded.
+    With `path`, the chart is also saved there.
+    """
+    p = PAPER
+    hours = forecast.index
+    span = hours[-1] - hours[0]
+    ceiling = max(10, np.ceil(np.nanmax([forecast.q90.max(), incumbent.max(), observed.max()]) / 5) * 5)
+
+    with paper():
+        figure, ax = plt.subplots(figsize=(6.4, 2.6))
+        if now is not None:
+            ax.axvspan(hours[0], now, color=p["past"], lw=0, zorder=0)
+        for (lower, upper), colour in zip(FAN, p["fan"]):
+            ax.fill_between(hours, forecast[f"q{lower}"], forecast[f"q{upper}"], color=colour, lw=0)
+        ax.plot(forecast.q50, color=p["median"], lw=1.4)
+        ax.plot(incumbent, color=p["incumbent"])
+        ax.plot(observed, color=p["outturn"], lw=1.4)
+        ax.axhline(0, color=p["rule"], lw=0.6)
+        if now is not None:
+            ax.plot(observed.index[-1], observed.iloc[-1], "o", ms=4, color=p["outturn"], mec=p["bg"], mew=1.2)
+            ax.vlines(now, 0, ceiling * 1.03, color=p["faint"], lw=0.6, ls=(0, (4, 3)), clip_on=False)
+            ax.text(now, ceiling * 1.05, "Now", ha="center", va="bottom", color=p["muted"])
+
+        last = forecast.q50.last_valid_index()
+        edges = [forecast.at[last, f"q{q}"] for q in LABELLED]
+        ys, middle, gap = list(edges), len(LABELLED) // 2, ceiling * 0.055
+        for k in range(middle - 1, -1, -1):
+            ys[k] = max(ys[k], ys[k + 1] + gap)
+        for k in range(middle + 1, len(ys)):
+            ys[k] = min(ys[k], ys[k - 1] - gap)
+        for q, edge, y in zip(LABELLED, edges, ys):
+            ax.annotate(f"p{q}", (last, edge), xytext=(last + span * 0.031, y), va="center",
+                        fontsize=6.5, color=p["ink"] if q == 50 else p["muted"],
+                        fontweight="semibold" if q == 50 else "normal", annotation_clip=False,
+                        arrowprops={"arrowstyle": "-", "color": p["rule"], "lw": 0.6, "shrinkA": 0, "shrinkB": 1})
+
+        ax.set(xlim=(hours[0], hours[-1]), ylim=(0, ceiling), yticks=np.arange(0, ceiling + 1, 5))
+        for day in hours[hours.hour == 0][1:]:
+            ax.axvline(day, color=p["rule2"], lw=0.6, zorder=0.5)
+        ticks = hours[hours.hour % (6 if span <= pd.Timedelta(days=3) else 24) == 0]
+        ax.set_xticks(ticks, [f"{t:%a %d %b}" if t.hour == 0 else f"{t:%H:%M}" for t in ticks])
+        for t, tick in zip(ticks, ax.get_xticklabels()):
+            if t.hour == 0:
+                tick.set(color=p["ink"], fontweight="semibold")
+
+        header(ax, "Wind generation, GW · UTC", [line(p["outturn"], 1.4), Fan(), line(p["incumbent"])],
+               ["Outturn", label, "NESO"], y=1.12)
+        if path:
+            figure.savefig(path)
+    return figure

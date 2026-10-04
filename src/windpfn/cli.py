@@ -24,11 +24,12 @@ RESULTS = sources.DATA / "results"
 PUBLIC = sources.ROOT / "notebooks/public"
 LIVE = PUBLIC / "live.csv"
 TABPFN = "tabpfn+windfor"
-BASELINES = {
+HELD_OUT = {
     "windfor": "NESO",
     "conformal": "NESO + conformal band",
-    "lgbm+windfor": "LightGBM, tuned",
-    TABPFN: "TabPFN-3.5",
+    "lgbm+windfor": "LightGBM · AIFS",
+    "tabpfn+windfor ifs": "TabPFN-3.5 · IFS",
+    "tabpfn+windfor aifs": "TabPFN-3.5 · AIFS",
 }
 
 
@@ -180,7 +181,7 @@ def page() -> None:
     """
     _parser(page.__doc__).parse_args()
     forecasts = evaluation.load_forecasts()
-    _, _, scores = evaluation.scorecard(forecasts, list(BASELINES)[1:])
+    _, _, scores = evaluation.scorecard(forecasts, list(HELD_OUT)[1:])
 
     countries = sources.get_json("naturalearth", weather.NATURAL_EARTH)["features"]
     outline = [
@@ -193,16 +194,12 @@ def page() -> None:
     lon, lat = weather.to_lonlat(farms.x.values, farms.y.values)
     points = weather.POINTS
 
-    tabpfn, windfor = scores.loc[TABPFN], scores.loc["windfor"]
     meta = {
         "freeze": evaluation.FREEZE_COMMIT,
         "days": int(forecasts.index.floor("D").nunique()),
-        "mae": tabpfn.MAE,
-        "mae_windfor": windfor.MAE,
-        "cover80": round(tabpfn.cover80, 4),
         "scores": [
             [label, round(scores.MAE[name]), None if pd.isna(scores.cover80[name]) else round(scores.cover80[name], 3)]
-            for name, label in BASELINES.items()
+            for name, label in HELD_OUT.items()
         ],
         "units": sorted(sources.wind_units().index),
         "outline": outline,

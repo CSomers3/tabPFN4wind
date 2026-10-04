@@ -128,8 +128,7 @@ def _():
         "accent": "#1F5FAD",
         "onshore": "#7FAADF",
         "faint": "#94A3B8",
-        "p10_p90": "#D4E2F5",
-        "p25_p75": "#A3C1E8",
+        "fan": ["#DCE7F4", "#C1D4EC", "#A6C2E4", "#8BAFDC"],
     }
 
     FONT = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif'
@@ -148,8 +147,9 @@ def _():
     .legend span {{ display: inline-flex; align-items: center; gap: 7px; }}
     .legend i {{ display: inline-block; width: 16px; height: 2px; border-radius: 1px; }}
     .legend i.fan {{ width: 18px; height: 12px; border-radius: 2px;
-                     background: linear-gradient({P["p10_p90"]} 22%, {P["p25_p75"]} 22% 42%, {P["accent"]} 42% 58%,
-                                                 {P["p25_p75"]} 58% 78%, {P["p10_p90"]} 78%); }}
+                     background: linear-gradient({P["fan"][0]} 12.5%, {P["fan"][1]} 12.5% 25%, {P["fan"][2]} 25% 37.5%,
+                                                 {P["fan"][3]} 37.5% 45%, {P["accent"]} 45% 55%, {P["fan"][3]} 55% 62.5%,
+                                                 {P["fan"][2]} 62.5% 75%, {P["fan"][1]} 75% 87.5%, {P["fan"][0]} 87.5%); }}
     .chart {{ display: block; width: 100%; height: auto; margin-top: 14px;
               font: 11px {FONT}; font-variant-numeric: tabular-nums; }}
     .chart text {{ fill: {P["faint"]}; }}
@@ -188,7 +188,8 @@ def _():
 @app.cell(hide_code=True)
 def _(P, np, pd):
     GW = 1000
-    LABELLED = (90, 75, 50, 25, 10)
+    FAN = ((10, 90), (20, 80), (30, 70), (40, 60))
+    LABELLED = (90, 70, 50, 30, 10)
 
     def gw(value) -> str:
         return "–" if pd.isna(value) else f"{value / GW:.1f}"
@@ -232,19 +233,18 @@ def _(P, np, pd):
 
     def chart(forecast: pd.DataFrame, incumbent: pd.DataFrame, observed: pd.Series, now: pd.Timestamp,
               W: int = 960, H: int = 380) -> str:
-        """Outturn since yesterday, then the most recent forecasts from TabPFN-3.5 (its full
-        distribution) and NESO, from the last settled hour to the end of tomorrow."""
+        """Outturn since yesterday under the forecasts from TabPFN-3.5 (its full distribution) and
+        NESO, each hour from the last update issued before it, to the end of tomorrow."""
         left, right, top, bottom = 34, 48, 26, 28
         base = H - bottom
         start = now.normalize() - pd.Timedelta(days=1)
-        joined = observed.index[-1] if len(observed) else now.floor("h")
-        ahead = forecast.loc[joined:, :].dropna(subset=["q50"])
+        issued = forecast.dropna(subset=["q50"])
         end = start + pd.Timedelta(hours=71)
-        if len(ahead):
-            end = min(end, ahead.index[-1])
+        if len(issued):
+            end = min(end, issued.index[-1])
         hours = pd.date_range(start, end, freq="h")
-        forecast = ahead.reindex(hours)
-        incumbent = incumbent[joined:].reindex(hours)
+        forecast = issued.reindex(hours)
+        incumbent = incumbent.reindex(hours)
         observed = observed[start:]
         step = (W - left - right) / (len(hours) - 1)
 
@@ -286,9 +286,9 @@ def _(P, np, pd):
 
         for part in runs(forecast.q50):
             block = forecast.loc[part.index]
-            for lower, upper in ((10, 90), (25, 75)):
+            for (lower, upper), colour in zip(FAN, P["fan"]):
                 edge = points(block[f"q{lower}"]) + points(block[f"q{upper}"])[::-1]
-                out.append(f'<path d="M{"L".join(edge)}Z" fill="{P[f"p{lower}_p{upper}"]}"/>')
+                out.append(f'<path d="M{"L".join(edge)}Z" fill="{colour}"/>')
         out.append(line(forecast.q50, P["accent"], 2))
         out.append(line(incumbent.generation, P["incumbent"], 1.5))
         out.append(line(observed, P["outturn"], 2))
@@ -356,7 +356,7 @@ def _(P, np, pd):
         mae_x, cover_x = label, label + panel + gap
         bottom = top + row * len(meta.scores)
         H = bottom + 16
-        colours = {"NESO": P["incumbent"], "NESO + conformal band": P["incumbent"], "TabPFN-3.5": P["accent"]}
+        colours = {"NESO": P["incumbent"], "NESO + conformal band": P["incumbent"]}
         out = [f'<text x="{mae_x}" y="12" class="head">Mean error, MW</text>',
                f'<text x="{cover_x}" y="12" class="head">Hours inside p10–p90</text>']
         target = cover_x + 0.8 * panel
@@ -364,8 +364,9 @@ def _(P, np, pd):
                    f'stroke-dasharray="3 3"/>')
         out.append(f'<text x="{target:.1f}" y="{H - 2}" text-anchor="middle" class="note">80% target</text>')
         for k, (name, mae, cover) in enumerate(meta.scores):
-            y, colour = top + row * k, colours.get(name, P["faint"])
-            weight = ' class="ours"' if name == "TabPFN-3.5" else ""
+            ours = name.startswith("TabPFN")
+            y, colour = top + row * k, P["accent"] if ours else colours.get(name, P["faint"])
+            weight = ' class="ours"' if ours else ""
             out.append(f'<text x="0" y="{y + 15}"{weight}>{name}</text>')
             width = mae / 1200 * panel
             out.append(f'<rect x="{mae_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
@@ -387,8 +388,9 @@ def _(CSS, mo):
     <style>{CSS}</style>
     <header class="page">
       <h1>Great Britain wind power</h1>
-      <p class="lede">TabPFN-3.5's forecast of tomorrow's output as a full probability
-      distribution, against the grid operator's own.</p>
+      <p class="lede">TabPFN-3.5's forecast of wind output as a full probability distribution,
+      against the grid operator's own. Past hours show the last forecast issued before each,
+      so outturn can be read against both.</p>
     </header>
     """)
     return
@@ -400,7 +402,7 @@ def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
     _parts = ["Live outturn unavailable" if observed is None else
               f"Outturn to <b>{_observed.index[-1]:%H:%M}</b>" if len(_observed) else "No outturn yet"]
     _read = incumbent.published.max()
-    _parts.append(f"forecasts from NESO's <b>{_read:%a %H:%M}</b> update")
+    _parts.append(f"latest forecasts from NESO's <b>{_read:%a %H:%M}</b> update")
     if newest is not None and newest > _read:
         _parts.append(f"NESO updated at {newest:%H:%M}; TabPFN-3.5 follows 15 minutes after")
     mo.Html(f"""
@@ -421,20 +423,22 @@ def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
 
 @app.cell(hide_code=True)
 def _(meta, mo, scores):
-    _lgbm = dict((name, (mae, cover)) for name, mae, cover in meta.scores)["LightGBM, tuned"]
+    _scores = {label: (mae, cover) for label, mae, cover in meta.scores}
+    _neso, _ifs, _aifs, _lgbm = (_scores[k] for k in ("NESO", "TabPFN-3.5 · IFS", "TabPFN-3.5 · AIFS", "LightGBM · AIFS"))
     mo.Html(f"""
     <div class="page inputs">
       {scores(meta)}
       <div class="text">
-        <p class="subhead">Held out: {meta.days} days of day-ahead forecasts, 2025–26</p>
-        <p>TabPFN-3.5's median missed by <b>{meta.mae:,.0f} MW</b> on average, against
-        {meta.mae_windfor:,.0f} MW for NESO's. A LightGBM tuned on 2024 with the same inputs comes
-        within {_lgbm[0] - meta.mae:,.0f} MW, but its p10–p90 holds only {_lgbm[1]:.0%} of hours.
-        TabPFN-3.5's holds <b>{meta.cover80:.0%}</b> with no calibration step.</p>
-        <p>NESO balances what its forecast misses close to real time, at a cost of £2.3bn in 2025.
-        WINDFOR missed by 9.4 TWh that year; at the gap between imbalance and day-ahead prices,
-        cutting the miss by a tenth is worth about £20m a year. TabPFN-3.5's was 10.7% smaller,
-        and its p10–p90 says how far tomorrow could miss by.</p>
+        <p class="subhead">Held out: {meta.days} days, 2025–26</p>
+        <p>NESO's forecast missed by {_neso[0]:,} MW on average. TabPFN-3.5's median missed by
+        <b>{_ifs[0]:,} MW</b> on ECMWF IFS weather and <b>{_aifs[0]:,} MW</b> on AIFS, the archive
+        this page runs on: {1 - _ifs[0] / _neso[0]:.0%} and {1 - _aifs[0] / _neso[0]:.0%} less. Its
+        p10–p90 held {_ifs[1]:.0%} and {_aifs[1]:.0%} of hours with no calibration step. A LightGBM
+        tuned on the same AIFS inputs missed by {_lgbm[0]:,} MW, and its p10–p90 held {_lgbm[1]:.0%}.</p>
+        <p>What the day-ahead forecast misses is made good in real time, from reserve plant or by
+        turning generation down. NESO spent £2.3bn balancing Britain's grid in 2025, and its wind
+        forecast missed by 9.4 TWh. Priced at the gap between imbalance and market prices, each
+        tenth of that miss costs about £20m a year, and it grows with every gigawatt of wind built.</p>
       </div>
     </div>
     """)

@@ -17,9 +17,10 @@ def _(mo):
     # 03 · Held-out test: TabPFN-3.5 vs NESO, 2025–2026
 
     The model from `02`, scored once on 2025-01-01 → 2026-09-15 under the protocol frozen
-    at `8e4386d`. The forecasts were produced by `windpfn-backtest tabpfn` and
-    committed at `d7df551`; this notebook only reads them, so it needs no network and no
-    token.
+    at `8e4386d`, on ECMWF IFS weather (`ifs`, committed at `d7df551`). The package then
+    moved to the open AIFS archive on dynamical.org, and TabPFN was rerun unchanged on it
+    (`aifs`). Both were produced by `windpfn-backtest tabpfn`; this notebook only reads
+    them, so it needs no network and no token.
 
     Monthly runs refit on every hour settled a day before issue; `frozen` runs keep the
     first month's context throughout. `blend` is the fixed 50/50 WINDFOR / power-curve
@@ -39,15 +40,16 @@ def _():
 
     style.use()
     WIDTH = 7.5
-    TABPFN = "tabpfn+windfor"
+    TABPFN = {"tabpfn+windfor ifs": "TabPFN-3.5 · IFS", "tabpfn+windfor aifs": "TabPFN-3.5 · AIFS"}
     return TABPFN, WIDTH, evaluation, pd, plt, sources, style
 
 
 @app.cell
 def _(evaluation):
     forecasts = evaluation.load_forecasts()
-    deciles, errors, scores = evaluation.scorecard(forecasts, [*evaluation.PROBABILISTIC, "tabpfn frozen"])
-    runs = ["windfor", "blend", "tabpfn", "tabpfn frozen", "tabpfn+windfor", "tabpfn+windfor frozen"]
+    _frozen = [f"tabpfn frozen {weather}" for weather in evaluation.WEATHER]
+    deciles, errors, scores = evaluation.scorecard(forecasts, [*evaluation.PROBABILISTIC, *_frozen])
+    runs = ["windfor", "blend", *[f"{run} {w}" for run in ("tabpfn", "tabpfn+windfor") for w in evaluation.WEATHER]]
     scores.loc[runs, ["MAE", "RMSE", "bias", "ΔMAE", "lo", "hi"]]
     return deciles, errors, forecasts, runs
 
@@ -57,7 +59,7 @@ def _(mo):
     mo.md(r"""
     ## By month
 
-    Refit runs solid, frozen runs dashed.
+    IFS runs dashed, AIFS runs solid.
     """)
     return
 
@@ -72,7 +74,7 @@ def _(WIDTH, errors, plt, runs, style):
     for run in runs:
         ax.plot(
             monthly.index, monthly[run], color=colours[run.split()[0]],
-            ls="--" if "frozen" in run else "-", marker="o", ms=2.5, label=run,
+            ls="--" if run.endswith(" ifs") else "-", marker="o", ms=2.5, label=run,
         )
     ax.set(ylabel="MAE (MW)", ylim=(0, None))
     ax.legend(ncol=3, loc="lower left", bbox_to_anchor=(0, 1))
@@ -102,7 +104,7 @@ def _(mo):
 
     In the live page's type and colours (`style.paper`). First, cumulative absolute error over
     every held-out hour: NESO's WINDFOR as issued, and TabPFN-3.5's median after
-    post-processing it.
+    post-processing it, on AIFS.
     """)
     return
 
@@ -113,7 +115,8 @@ def _(TABPFN, forecasts, plt, sources, style):
 
     PAPER_WIDTH = 6.4
     _p = style.PAPER
-    windfor, tabpfn = ((forecasts.y - forecasts[_run]).abs().cumsum() / 1e6 for _run in ("windfor", f"{TABPFN}|q50"))
+    BEST = "tabpfn+windfor aifs"
+    windfor, tabpfn = ((forecasts.y - forecasts[_run]).abs().cumsum() / 1e6 for _run in ("windfor", f"{BEST}|q50"))
     end = windfor.index[-1]
 
     with style.paper():
@@ -159,9 +162,10 @@ def _(mo):
 def _(PAPER_WIDTH, TABPFN, forecasts, plt, sources, style):
     _p = style.PAPER
     runs_shown = {
-        TABPFN: ("TabPFN-3.5", _p["forecast"]),
+        "tabpfn+windfor ifs": ("TabPFN-3.5 · IFS", _p["fan"][2]),
+        "tabpfn+windfor aifs": ("TabPFN-3.5 · AIFS", _p["median"]),
         "conformal": ("NESO + conformal", _p["incumbent"]),
-        "lgbm+windfor": ("LightGBM", _p["faint"]),
+        "lgbm+windfor": ("LightGBM · AIFS", _p["faint"]),
     }
     levels = [20, 40, 60, 80]
 
@@ -184,7 +188,7 @@ def _(PAPER_WIDTH, TABPFN, forecasts, plt, sources, style):
         style.header(width_ax, "Mean interval width, GW")
         figure_calibration.legend([style.line(_colour) for _, _colour in runs_shown.values()],
                                   [_label for _label, _ in runs_shown.values()], loc="lower right",
-                                  bbox_to_anchor=(width_ax.get_position().x1, 1.0), ncol=3)
+                                  bbox_to_anchor=(width_ax.get_position().x1, 1.0), ncol=4)
         figure_calibration.savefig(sources.ROOT / "notebooks" / "calibration.png")
     figure_calibration
     return
@@ -195,20 +199,23 @@ def _(mo):
     mo.md(r"""
     ## Worst days
 
-    The eight days TabPFN lost worst to NESO, and the share of their hours inside its
-    10–90% band. Calibrated on average is not calibrated on bad days.
+    For each weather source, the eight days TabPFN lost worst to NESO, and the share of their
+    hours inside its 10–90% band. Calibrated on average is not calibrated on bad days.
     """)
     return
 
 
 @app.cell
-def _(TABPFN, deciles, errors, forecasts):
+def _(TABPFN, deciles, errors, forecasts, pd):
     daily = errors.abs().groupby(errors.index.floor("D")).mean()
-    worst = (daily[TABPFN] - daily.windfor).nlargest(8)
-    q_all = deciles[TABPFN]
-    in_band = forecasts.y.between(q_all.q10, q_all.q90).groupby(forecasts.index.floor("D")).mean()
-    print(f"inside 10–90% on those days: {in_band[worst.index].mean():.0%} of hours")
-    worst.round(0).to_frame("MAE lost vs NESO (MW)").join(in_band.rename("in band").round(2))
+    _worst = {}
+    for _run in TABPFN:
+        _q = deciles[_run]
+        _in_band = forecasts.y.between(_q.q10, _q.q90).groupby(forecasts.index.floor("D")).mean()
+        _lost = (daily[_run] - daily.windfor).nlargest(8)
+        print(f"{_run}: inside 10–90% on its worst days, {_in_band[_lost.index].mean():.0%} of hours")
+        _worst[_run] = _lost.round(0).to_frame("MAE lost vs NESO (MW)").join(_in_band.rename("in band").round(2))
+    pd.concat(_worst)
     return
 
 

@@ -17,8 +17,8 @@ def _(mo):
     # 04 · Reference forecasts
 
     Added after the one-shot test in `03`, to ask whether the gain comes from TabPFN or
-    from the features and protocol. Same features, target, context and embargo; the TabPFN
-    forecasts are read from `data/`, never rerun.
+    from the features and protocol. Same features, target, context and embargo, and the same
+    AIFS weather as TabPFN's `aifs` run; the TabPFN forecasts are read from `data/`.
 
     - `lgbm`: quantile LightGBM, one model per decile, hyperparameters chosen on 2024 only.
     - `conformal`: WINDFOR plus its empirical error deciles within WINDFOR-level quintiles.
@@ -88,25 +88,26 @@ def _(evaluation):
 
 @app.cell
 def _(scores):
-    _gain = -scores.loc["tabpfn+windfor", "ΔMAE"]
-    for _name in ("conformal", "lgbm+windfor"):
-        print(f"{_name} recovers {-scores.loc[_name, 'ΔMAE']:.0f} of TabPFN's {_gain:.0f} MW")
-    _narrower = 1 - scores.loc["tabpfn+windfor", "width80"] / scores.loc["conformal", "width80"]
-    print(f"TabPFN's 10–90% interval is {_narrower:.0%} narrower than conformal")
+    for _tabpfn in ("tabpfn+windfor ifs", "tabpfn+windfor aifs"):
+        _gain = -scores.loc[_tabpfn, "ΔMAE"]
+        for _name in ("conformal", "lgbm+windfor"):
+            print(f"{_name} recovers {-scores.loc[_name, 'ΔMAE']:.0f} of {_tabpfn}'s {_gain:.0f} MW")
+        _narrower = 1 - scores.loc[_tabpfn, "width80"] / scores.loc["conformal", "width80"]
+        print(f"{_tabpfn}'s 10–90% interval is {_narrower:.0%} narrower than conformal")
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    LightGBM against TabPFN directly, positive where LightGBM is worse:
+    LightGBM against TabPFN directly on the same AIFS inputs, positive where LightGBM is worse:
     """)
     return
 
 
 @app.cell
 def _(errors, evaluation):
-    evaluation.point_scores(errors[["tabpfn+windfor", "lgbm+windfor"]], reference="tabpfn+windfor")
+    evaluation.point_scores(errors[["tabpfn+windfor aifs", "lgbm+windfor"]], reference="tabpfn+windfor aifs")
     return
 
 

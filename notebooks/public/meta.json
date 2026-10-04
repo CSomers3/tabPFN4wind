@@ -1,9 +1,6 @@
 {
  "freeze": "8e4386d",
  "days": 623,
- "mae": 912.0,
- "mae_windfor": 1022.0,
- "cover80": 0.8056,
  "scores": [
   [
    "NESO",
@@ -16,14 +13,19 @@
    0.792
   ],
   [
-   "LightGBM, tuned",
+   "LightGBM · AIFS",
    929,
    0.672
   ],
   [
-   "TabPFN-3.5",
+   "TabPFN-3.5 · IFS",
    912,
    0.806
+  ],
+  [
+   "TabPFN-3.5 · AIFS",
+   876,
+   0.819
   ]
  ],
  "units": [

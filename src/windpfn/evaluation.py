@@ -1,7 +1,8 @@
 """Scoring, and the committed held-out forecasts it runs on. Everything here is in MW.
 
-The held-out window was scored once, under the protocol frozen at FREEZE_COMMIT. Its forecasts
-are committed in data/, so the scorecard rebuilds offline without raw pulls or a TabPFN token.
+The held-out window was scored once, under the protocol frozen at FREEZE_COMMIT, with ECMWF IFS
+weather. TabPFN was then rerun unchanged on the AIFS archive the package reads. Both sets of
+forecasts are committed in data/, so the scorecard rebuilds offline without raw pulls or a token.
 """
 
 from __future__ import annotations
@@ -15,13 +16,12 @@ FREEZE_COMMIT = "8e4386d"
 RESULTS_COMMIT = "d7df551"
 TEST_START, TEST_END = "2025-01-01", "2026-09-15"
 
+WEATHER = {"ifs": "test_forecasts.parquet", "aifs": "test_forecasts_aifs.parquet"}
 PROBABILISTIC = [
     "conformal",
     "lgbm",
     "lgbm+windfor",
-    "tabpfn",
-    "tabpfn+windfor",
-    "tabpfn+windfor frozen",
+    *[f"{run} {weather}" for run in ("tabpfn", "tabpfn+windfor", "tabpfn+windfor frozen") for weather in WEATHER],
 ]
 
 BOOTSTRAP_DRAWS = 2000
@@ -73,10 +73,13 @@ def probabilistic_scores(deciles: dict[str, pd.DataFrame], y: pd.Series) -> pd.D
 
 
 def load_forecasts() -> pd.DataFrame:
-    """The committed held-out forecasts with outturn `y`, WINDFOR and the blend, per hour."""
-    tabpfn = pd.read_parquet(sources.DATA / "test_forecasts.parquet")
+    """The committed held-out forecasts with outturn `y`, WINDFOR and the blend, per hour. TabPFN's
+    runs are tagged with their weather, as 'tabpfn+windfor ifs' and 'tabpfn+windfor aifs'."""
+    frames = {weather: pd.read_parquet(sources.DATA / name) for weather, name in WEATHER.items()}
+    tabpfn = {f"{run} {weather}": deciles for weather, frame in frames.items() for run, deciles in forecasting.unpack(frame).items()}
+    columns = frames["ifs"].drop(columns=frames["ifs"].filter(like="|").columns)
     references = pd.read_parquet(sources.DATA / "reference_forecasts.parquet")
-    return tabpfn.join(references)
+    return columns.join(forecasting.pack(tabpfn)).join(references)
 
 
 def load_lead_forecasts() -> pd.DataFrame:

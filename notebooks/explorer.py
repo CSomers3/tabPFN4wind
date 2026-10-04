@@ -113,7 +113,7 @@ async def _(latest_update, live, outturn, pd):
 
 
 @app.cell(hide_code=True)
-def _(np):
+def _():
     P = {
         "bg": "#FFFFFF",
         "past": "#F5F7FA",
@@ -128,13 +128,9 @@ def _(np):
         "accent": "#1F5FAD",
         "onshore": "#7FAADF",
         "faint": "#94A3B8",
+        "p10_p90": "#D4E2F5",
+        "p25_p75": "#A3C1E8",
     }
-    TAIL, CENTRE = np.array([228, 237, 249]), np.array([62, 122, 196])
-
-    def shade(depth: float) -> str:
-        """Blue for a percentile `depth` from the median: 0 at p0/p100, 1 at p50."""
-        red, green, blue = (TAIL + (CENTRE - TAIL) * depth).round().astype(int)
-        return f"#{red:02X}{green:02X}{blue:02X}"
 
     FONT = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif'
     CSS = f"""
@@ -152,7 +148,8 @@ def _(np):
     .legend span {{ display: inline-flex; align-items: center; gap: 7px; }}
     .legend i {{ display: inline-block; width: 16px; height: 2px; border-radius: 1px; }}
     .legend i.fan {{ width: 18px; height: 12px; border-radius: 2px;
-                     background: linear-gradient({shade(0.1)}, {shade(0.9)} 42%, #fff 42% 58%, {shade(0.9)} 58%, {shade(0.1)}); }}
+                     background: linear-gradient({P["p10_p90"]} 22%, {P["p25_p75"]} 22% 42%, {P["accent"]} 42% 58%,
+                                                 {P["p25_p75"]} 58% 78%, {P["p10_p90"]} 78%); }}
     .chart {{ display: block; width: 100%; height: auto; margin-top: 14px;
               font: 11px {FONT}; font-variant-numeric: tabular-nums; }}
     .chart text {{ fill: {P["faint"]}; }}
@@ -185,13 +182,13 @@ def _(np):
     .inputs .text p + p {{ margin-top: 10px; }}
     .credit {{ color: {P["muted"]}; font-size: 12px; margin-top: 12px; }}
     """
-    return CSS, P, shade
+    return CSS, P
 
 
 @app.cell(hide_code=True)
-def _(P, np, pd, shade):
+def _(P, np, pd):
     GW = 1000
-    LABELLED = (99, 90, 50, 10, 1)
+    LABELLED = (90, 75, 50, 25, 10)
 
     def gw(value) -> str:
         return "–" if pd.isna(value) else f"{value / GW:.1f}"
@@ -289,10 +286,10 @@ def _(P, np, pd, shade):
 
         for part in runs(forecast.q50):
             block = forecast.loc[part.index]
-            for lower in range(1, 50):
-                edge = points(block[f"q{lower}"]) + points(block[f"q{100 - lower}"])[::-1]
-                out.append(f'<path d="M{"L".join(edge)}Z" fill="{shade(lower / 50)}"/>')
-        out.append(line(forecast.q50, P["bg"], 1.5))
+            for lower, upper in ((10, 90), (25, 75)):
+                edge = points(block[f"q{lower}"]) + points(block[f"q{upper}"])[::-1]
+                out.append(f'<path d="M{"L".join(edge)}Z" fill="{P[f"p{lower}_p{upper}"]}"/>')
+        out.append(line(forecast.q50, P["accent"], 2))
         out.append(line(incumbent.generation, P["incumbent"], 1.5))
         out.append(line(observed, P["outturn"], 2))
 

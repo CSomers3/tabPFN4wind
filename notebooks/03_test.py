@@ -118,7 +118,7 @@ def _(TABPFN, forecasts, plt, sources, style):
 
     with style.paper():
         figure_miss, miss_ax = plt.subplots(figsize=(PAPER_WIDTH, 2.4))
-        miss_ax.fill_between(windfor.index, tabpfn, windfor, color=style.FAN(0), lw=0)
+        miss_ax.fill_between(windfor.index, tabpfn, windfor, color=_p["gap"], lw=0)
         miss_ax.plot(windfor, color=_p["incumbent"])
         miss_ax.plot(tabpfn, color=_p["forecast"])
         miss_ax.axhline(0, color=_p["rule"], lw=0.6)

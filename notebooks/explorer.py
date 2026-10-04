@@ -254,7 +254,7 @@ def _(P, np, pd):
         def Xs(index) -> np.ndarray:
             return left + ((index - start) / pd.Timedelta("1h")).to_numpy() * step
 
-        peak = np.nanmax([forecast.q99.max(), incumbent.generation.max(), observed.max(), 1])
+        peak = np.nanmax([forecast.q90.max(), incumbent.generation.max(), observed.max(), 1])
         ceiling = max(10 * GW, np.ceil(peak / (5 * GW)) * 5 * GW)
 
         def Y(v):

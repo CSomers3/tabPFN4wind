@@ -17,8 +17,8 @@ def _(mo):
     # 05 · Live
 
     A still of the live page's chart (`explorer.py`), drawn the same way: outturn since
-    yesterday, then the most recent forecasts from TabPFN-3.5 (its full distribution, p1–p99)
-    and NESO, from the last settled hour to the end of tomorrow. Reads
+    yesterday, then the most recent forecasts from TabPFN-3.5 (its p10–p90 and p25–p75 bands
+    and median) and NESO, from the last settled hour to the end of tomorrow. Reads
     `notebooks/public/live.csv` and pulls outturn from Elexon.
 
     Produces the README figure `live.png`.
@@ -57,14 +57,14 @@ def _(live, now, np, observed, pd, plt, sources, start, style):
     hours = pd.date_range(start, min(start + pd.Timedelta(hours=71), ahead.index[-1]), freq="h")
     forecast = ahead.drop(columns="issue_time").reindex(hours) / 1e3
     incumbent = forecast.windfor
-    ceiling = max(10, np.ceil(np.nanmax([forecast.q99.max(), incumbent.max(), observed.max() / 1e3]) / 5) * 5)
+    ceiling = max(10, np.ceil(np.nanmax([forecast.q90.max(), incumbent.max(), observed.max() / 1e3]) / 5) * 5)
 
     with style.paper():
         figure, ax = plt.subplots(figsize=(6.4, 2.6))
         ax.axvspan(start, now, color=_p["past"], lw=0, zorder=0)
-        for _lower in range(1, 50):
-            ax.fill_between(hours, forecast[f"q{_lower}"], forecast[f"q{100 - _lower}"], color=style.FAN(_lower / 50), lw=0)
-        ax.plot(forecast.q50, color=_p["bg"])
+        for _lower, _upper in ((10, 90), (25, 75)):
+            ax.fill_between(hours, forecast[f"q{_lower}"], forecast[f"q{_upper}"], color=_p[f"p{_lower}_p{_upper}"], lw=0)
+        ax.plot(forecast.q50, color=_p["median"], lw=1.4)
         ax.plot(incumbent, color=_p["incumbent"])
         ax.plot(observed / 1e3, color=_p["outturn"], lw=1.4)
         ax.plot(joined, observed.iloc[-1] / 1e3, "o", ms=4, color=_p["outturn"], mec=_p["bg"], mew=1.2)
@@ -73,7 +73,7 @@ def _(live, now, np, observed, pd, plt, sources, start, style):
         ax.text(now, ceiling * 1.05, "Now", ha="center", va="bottom", color=_p["muted"])
 
         _last = forecast.q50.last_valid_index()
-        _labelled = [99, 90, 50, 10, 1]
+        _labelled = [90, 75, 50, 25, 10]
         _edges = [forecast.at[_last, f"q{_q}"] for _q in _labelled]
         _gap = ceiling * 0.055
         _ys = list(_edges)

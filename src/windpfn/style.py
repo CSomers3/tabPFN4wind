@@ -10,7 +10,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib as mpl
-import numpy as np
 from matplotlib import font_manager
 
 PALETTE = {
@@ -38,9 +37,11 @@ PAPER = {  # notebooks/explorer.py's palette, so the README figures match the li
     "outturn": "#0F172A",
     "incumbent": "#C2255C",
     "forecast": "#3E7AC4",
+    "median": "#1F5FAD",
+    "p10_p90": "#D4E2F5",
+    "p25_p75": "#A3C1E8",
+    "gap": "#E4EDF9",
 }
-
-FAN = mpl.colors.LinearSegmentedColormap.from_list("fan", ["#E4EDF9", PAPER["forecast"]])  # p0/p100 -> p50
 
 PX = 0.75  # CSS px -> pt
 
@@ -141,17 +142,19 @@ def paper():
 
 
 class Fan:
-    """Legend handle for the predictive distribution: the page's blue swatch, darkest at the median."""
+    """Legend handle for the predictive distribution: the page's p10–p90 and p25–p75 bands and median."""
 
 
 class _FanHandler:
     def legend_artist(self, legend, handle, fontsize, box):
-        middle, half = box.height / 2, box.height * 0.75
-        for depth in np.linspace(0.05, 1, 12):
+        middle, half = box.ydescent + box.height / 2, box.height * 0.75
+        for key, height in (("p10_p90", half), ("p25_p75", half * 0.55)):
             box.add_artist(mpl.patches.Rectangle(
-                (box.xdescent, box.ydescent + middle - half * (1.05 - depth)), box.width,
-                2 * half * (1.05 - depth), facecolor=FAN(depth), lw=0,
+                (box.xdescent, middle - height), box.width, 2 * height, facecolor=PAPER[key], lw=0,
             ))
+        box.add_artist(mpl.lines.Line2D(
+            [box.xdescent, box.xdescent + box.width], [middle, middle], color=PAPER["median"], lw=1.4,
+        ))
         return box
 
 

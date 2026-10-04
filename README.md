@@ -81,7 +81,7 @@ predicted = model.predict(features[test], output_type="quantiles", quantiles=qua
 
 A [GitHub Action](.github/workflows/live.yml) runs twenty minutes after each of NESO's eight daily updates. `windpfn-live` reads the full history in `data/history/`, pulls everything published since, and issues TabPFN-3.5's p1–p99 for every hour the update covers. The forecast is committed to `notebooks/public/live.csv`, so the git log records each one before its outturn, and the [live page](https://csomers3.github.io/tabPFN4wind/) ([notebooks/explorer.py](notebooks/explorer.py)) is redeployed. The page pulls outturn from Elexon on load.
 
-![A still of the live page: outturn since yesterday, then TabPFN-3.5's p1–p99 distribution and NESO's forecast from the last settled hour to the end of tomorrow](notebooks/live.png)
+![A still of the live page: outturn since yesterday, then TabPFN-3.5's median with its p10–p90 and p25–p75 bands, and NESO's forecast from the last settled hour to the end of tomorrow](notebooks/live.png)
 
 ## Data
 

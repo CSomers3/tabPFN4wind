@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from windpfn import dataset, evaluation, forecasting, sources, weather
+from windpfn import dataset, evaluation, forecasting, sources
 
 RESULTS = sources.DATA / "results"
 PUBLIC = sources.ROOT / "notebooks/public"
@@ -152,26 +152,22 @@ def page() -> None:
     """Export the data behind notebooks/explorer.py, which runs under Pyodide without windpfn.
 
     Writes notebooks/public/meta.json: the wind units whose curtailment the page adds to live outturn,
-    and the map of wind farms and weather points.
+    and the held-out MAE and 80% interval coverage of TabPFN-3.5 · AIFS, NESO and the two references.
     `windpfn-live` writes live.csv beside it.
     """
     _parser(page.__doc__).parse_args()
-    countries = sources.get_json("naturalearth", weather.NATURAL_EARTH)["features"]
-    outline = [
-        [[round(lon, 2), round(lat, 2)] for lon, lat in polygon[0]]
-        for country in countries
-        if country["properties"]["ADM0_A3"] in ("GBR", "IRL")
-        for polygon in country["geometry"]["coordinates"]
-    ]
-    farms = weather.farms()
-    lon, lat = weather.to_lonlat(farms.x.values, farms.y.values)
-    points = weather.POINTS
+    forecasts = evaluation.load_forecasts()
+    names = {**HELD_OUT, **ABLATION}
+    shown = ["windfor", *forecasting.REFERENCES, "tabpfn+windfor aifs"]
+    _, _, table = evaluation.scorecard(forecasts, shown[1:])
 
     meta = {
         "units": sorted(sources.wind_units().index),
-        "outline": outline,
-        "farms": [[round(x, 3), round(y, 3), round(mw)] for x, y, mw in zip(lon, lat, farms.mw)],
-        "points": [[p.lon, p.lat, p.mw, name.startswith("off")] for name, p in points.iterrows()],
+        "days": int(forecasts.index.floor("D").nunique()),
+        "scores": [
+            [names[name], round(table.MAE[name]), None if pd.isna(table.cover80[name]) else round(table.cover80[name], 3)]
+            for name in shown
+        ],
     }
     PUBLIC.mkdir(exist_ok=True)
     (PUBLIC / "meta.json").write_text(json.dumps(meta, indent=1, ensure_ascii=False), encoding="utf-8")

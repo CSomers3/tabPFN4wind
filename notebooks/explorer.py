@@ -153,7 +153,8 @@ def _():
     .chart {{ display: block; width: 100%; height: auto; margin-top: 14px;
               font: 11px {FONT}; font-variant-numeric: tabular-nums; }}
     .chart text {{ fill: {P["faint"]}; }}
-    .chart text.date {{ fill: {P["ink"]}; font-weight: 600; }}
+    .chart text.date {{ fill: {P["ink2"]}; font-weight: 500; }}
+    .chart text.axis {{ fill: {P["muted"]}; }}
     .chart text.now {{ fill: {P["muted"]}; }}
     .chart text.label {{ fill: {P["muted"]}; font-size: 10.5px; }}
     .chart text.median {{ fill: {P["ink"]}; font-weight: 600; font-size: 10.5px; }}
@@ -235,7 +236,7 @@ def _(P, np, pd):
               W: int = 960, H: int = 380) -> str:
         """Outturn since yesterday under the forecasts from TabPFN-3.5 (its full distribution) and
         NESO, each hour from the last update issued before it, to the end of tomorrow."""
-        left, right, top, bottom = 34, 48, 26, 28
+        left, right, top, bottom = 34, 48, 30, 46
         base = H - bottom
         start = now.normalize() - pd.Timedelta(days=1)
         issued = forecast.dropna(subset=["q50"])
@@ -274,15 +275,17 @@ def _(P, np, pd):
             out.append(f'<line x1="{left}" x2="{W - right}" y1="{Y(v):.1f}" y2="{Y(v):.1f}" '
                        f'stroke="{P["rule"] if v == 0 else P["rule2"]}"/>')
             out.append(f'<text x="{left - 8}" y="{Y(v) + 4:.1f}" text-anchor="end">{v / GW:.0f}</text>')
-        for t in hours[hours.hour % 6 == 0]:
-            x = X(t)
-            if t.hour == 0:
-                if t != start:
-                    out.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{top}" y2="{base}" stroke="{P["rule2"]}"/>')
-                anchor = "start" if t == start else "middle"
-                out.append(f'<text x="{x:.1f}" y="{base + 17}" text-anchor="{anchor}" class="date">{t:%a %d %b}</text>')
-            else:
-                out.append(f'<text x="{x:.1f}" y="{base + 17}" text-anchor="middle">{t:%H:%M}</text>')
+        out.append(f'<text x="0" y="{top - 14}" class="axis">Wind output, GW</text>')
+        for t in hours[(hours.hour % 6 == 0) & (hours.hour > 0)]:
+            out.append(f'<text x="{X(t):.1f}" y="{base + 16}" text-anchor="middle">{t:%H:%M}</text>')
+        for day in pd.date_range(start, end.normalize()):
+            x = X(day)
+            if day != start:
+                out.append(f'<line x1="{x:.1f}" x2="{x:.1f}" y1="{top}" y2="{base + 40}" stroke="{P["rule2"]}"/>')
+            close = X(min(day + pd.Timedelta(days=1), end))
+            if close - x > 12 * step:
+                out.append(f'<text x="{(x + close) / 2:.1f}" y="{base + 36}" text-anchor="middle" '
+                           f'class="date">{day:%A %d %b}</text>')
 
         for part in runs(forecast.q50):
             block = forecast.loc[part.index]
@@ -399,16 +402,15 @@ def _(CSS, mo):
 @app.cell(hide_code=True)
 def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
     _observed = observed if observed is not None else pd.Series(dtype=float)
-    _parts = ["Live outturn unavailable" if observed is None else
-              f"Outturn to <b>{_observed.index[-1]:%H:%M}</b>" if len(_observed) else "No outturn yet"]
-    _read = incumbent.published.max()
-    _parts.append(f"latest forecasts from NESO's <b>{_read:%a %H:%M}</b> update")
-    if newest is not None and newest > _read:
-        _parts.append(f"NESO updated at {newest:%H:%M}; TabPFN-3.5 follows 15 minutes after")
+    _parts = [f"Latest forecast issued <b>{live.issue_time.max():%a %d %b, %H:%M} UTC</b>"]
+    if newest is not None and newest > incumbent.published.max():
+        _parts.append(f"NESO's {newest:%H:%M} update not yet included")
+    if observed is None:
+        _parts.append("live outturn unavailable")
     mo.Html(f"""
     <div class="page">
       <div class="bar">
-        <span>{" · ".join(_parts)} · UTC, GW</span>
+        <span>{" · ".join(_parts)}</span>
         <span class="legend">
           <span><i style="background:{P["outturn"]}"></i>Outturn</span>
           <span><i class="fan"></i>TabPFN-3.5</span>

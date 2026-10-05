@@ -1,37 +1,29 @@
-# windpfn: day-ahead wind forecasts for Great Britain with TabPFN-3.5
+![Using tabular foundation models to upgrade the grid: an isometric scene of offshore and onshore wind turbines feeding a town, with a probabilistic forecast above it](.github/hero.svg)
 
-Wind generated a third of Great Britain's metered electricity in 2025, and the grid is scheduled a day ahead on the system operator's forecast of it. What that forecast misses is made good in real time: NESO's WINDFOR missed by 9.4 TWh in 2025, a year in which balancing the grid cost £2.3bn. Each tenth of that miss costs about £20m a year, and the cost grows with every gigawatt of wind built.
+## Why it matters
 
-windpfn passes NESO's forecast, public ECMWF weather and every settled hour of outturn to TabPFN-3.5, a tabular foundation model, with no training or tuning. Over 623 held-out days it cuts NESO's miss by 11–14% and returns a calibrated probability distribution for every hour. It runs [live](https://csomers3.github.io/tabPFN4wind/), fifteen minutes after each NESO update.
+Wind made a third of Great Britain's electricity in 2025. The grid is planned a day ahead around the system operator's forecast of that wind, and whatever the forecast gets wrong has to be fixed on the day, by starting up reserve plant or by paying wind farms to switch off.
 
-![Cumulative absolute error over 14,952 held-out hours, 2025–26: NESO's forecast reaches 15.3 TWh, TabPFN-3.5 post-processing it on AIFS weather reaches 13.1 TWh, 14.3% less](notebooks/miss.png)
+That correction is expensive. NESO's day-ahead wind forecast missed by 9.4 TWh in 2025, a year in which balancing the grid cost £2.3bn. Every 10% cut in that miss is worth about £20m a year, and the figure grows with each new gigawatt of wind.
 
-## Results
+## What we did
 
-The test covers 2025-01-01 → 2026-09-15 and was scored under a protocol frozen beforehand ([`8e4386d`](../../commit/8e4386d)). The frozen run read ECMWF IFS weather. The pipeline then moved to the open AIFS archive and was rerun with nothing else changed. Both runs are shown.
+We gave TabPFN-3.5, a tabular foundation model, three things anyone can download: NESO's own forecast, ECMWF's open weather forecast, and a history of what the wind actually produced. There is no training and no tuning. Each forecast is a single forward pass, and it comes back as a full probability distribution for every hour rather than one number.
 
-| 14,952 hours, MW | MAE | ΔMAE vs NESO [95% CI] | CRPS | 10–90% coverage | Winkler |
-|---|---|---|---|---|---|
-| NESO WINDFOR | 1,022 | | 1,022 | | |
-| WINDFOR + conformal band ¹ | 1,004 | −18 [−30, −6] | 788 | 79.2% | 4,659 |
-| LightGBM · AIFS ¹ | 929 | −93 [−121, −65] | 737 | 67.2% | 4,492 |
-| **TabPFN-3.5 · IFS** ² | **912** | **−109 [−146, −72]** | **714** | **80.6%** | **4,195** |
-| **TabPFN-3.5 · AIFS** ³ | **876** | **−146 [−183, −110]** | **685** | **81.9%** | **4,009** |
+On 623 days it had never seen, from January 2025 to September 2026, it cut NESO's error by 11–14%, and its uncertainty bands held the right share of outcomes without any calibration step. It now runs [live](https://csomers3.github.io/tabPFN4wind/), fifteen minutes after every NESO update.
 
-Lower is better, and coverage targets 80%. A point forecast's CRPS is its MAE. The intervals are 95% day-block bootstrap.
-¹ Added after the test and tuned on 2024 only. ² The frozen one-shot test, on ECMWF IFS at 100 m. ³ The same protocol on ECMWF AIFS at 10 m, which the package and the live forecast read.
+![Cumulative absolute error over 14,952 held-out hours: NESO's forecast reaches 15.3 TWh, TabPFN-3.5 reaches 13.1 TWh, 14.3% less](notebooks/miss.png)
 
-- **The gain needs weather, and TabPFN uses it best.** Recalibrating WINDFOR by its own errors recovers 18 MW, and TabPFN on weather alone only ties NESO. On identical AIFS inputs, TabPFN beats a tuned LightGBM by 53 MW (95% CI 24 to 84).
-- **Its distribution is calibrated without a calibration step.** Every central interval covers within 2.5 points of nominal, and its p10–p90 is 11% narrower than the conformal band. LightGBM's quantiles fall up to 13 points short.
-- **It fails when the weather does.** On the eight days it lost worst to NESO, outturn fell inside its p10–p90 in only 35–42% of hours. During Storm Éowyn it overshot by 2.2–2.3 GW on the day, while NESO was within 0.1 GW.
+## How it works
 
-![Left: coverage minus nominal from p40–p60 to p10–p90, both TabPFN-3.5 runs within 2.5 points above zero, NESO + conformal within 1 point below, LightGBM 5–13 points short. Right: mean interval width, TabPFN-3.5 narrower than NESO + conformal at every level](notebooks/calibration.png)
+Each forecast uses only what was public at the moment it was made.
 
-Prior Labs' [performance guidance](https://docs.priorlabs.ai/improving-performance) was tested on 2024 data ([`02`](notebooks/02_development.py)). Feature ratios, native datetime handling, Thinking mode and per-estimator subsampling all failed to beat the defaults.
+- **Weather**: ECMWF's AIFS wind forecast at 20 points, each the capacity-weighted centre of a cluster of British wind farms, turned into expected output with a standard turbine power curve.
+- **NESO's forecast**: the very update it is competing with.
+- **Context**: every hour whose real output had settled at least a day earlier, refreshed monthly. That is 6,944 hours in January 2025 and 21,537 by September 2026.
+- **Target**: metered wind plus the wind NESO paid farms to switch off, which is what NESO's forecast aims at.
 
-## The model
-
-From [src/windpfn/forecasting.py](src/windpfn/forecasting.py):
+The model itself is three lines:
 
 ```python
 model = TabPFNRegressor.create_default_for_version("v3.5")
@@ -39,15 +31,35 @@ model.fit(features[train], (table.y / table.cap)[train])
 deciles = model.predict(features[test], output_type="quantiles", quantiles=QUANTILES)
 ```
 
-`features` holds 66 numeric columns: power-curve capacity factor and wind direction at 20 wind-farm clusters, capacity, lead time, calendar and WINDFOR. `train` is every hour settled a day before issue, so each monthly refit only lengthens the context: 6,944 hours in January 2025, 21,537 by September 2026. With the context frozen at January 2025, TabPFN still scores 922 MW on IFS and 886 MW on AIFS.
+## Results
+
+The test protocol was fixed before any test score existed (commit `8e4386d`), and the test was scored once, on ECMWF's IFS weather. The pipeline then moved to the open AIFS archive, which anyone can query, and was rerun with nothing else changed. Both runs are shown.
+
+| 14,952 hours, MW | MAE | vs NESO [95% CI] | CRPS | 10–90% coverage | Winkler |
+|---|---|---|---|---|---|
+| NESO | 1,022 | | 1,022 | | |
+| NESO + conformal band | 1,004 | −18 [−30, −6] | 788 | 79.2% | 4,659 |
+| LightGBM · AIFS | 929 | −93 [−121, −65] | 737 | 67.2% | 4,492 |
+| **TabPFN-3.5 · IFS** | **912** | **−109 [−146, −72]** | **714** | **80.6%** | **4,195** |
+| **TabPFN-3.5 · AIFS** | **876** | **−146 [−183, −110]** | **685** | **81.9%** | **4,009** |
+
+Lower is better, and the 10–90% band should hold 80% of hours. Intervals resample whole days. The two references were added after the test and tuned on 2024 only.
+
+- **The gain comes from the weather, and TabPFN uses it best.** Recalibrating NESO's forecast on its own errors recovers only 18 MW. On identical inputs, TabPFN beats a tuned LightGBM by 53 MW (95% CI 24 to 84).
+- **Its uncertainty is honest out of the box.** Every central band holds within 2.5 points of its target, and its 10–90% band is 11% narrower than the recalibrated one. LightGBM's bands fall up to 13 points short.
+- **It fails when the weather forecast does.** On its eight worst days against NESO, only 35–42% of hours fell inside its 10–90% band. During Storm Éowyn it overshot by more than 2 GW while NESO was within 0.1 GW.
+
+![Left: coverage minus target from p40–p60 to p10–p90, TabPFN-3.5 within 2.5 points, NESO + conformal within 1 point, LightGBM 5–13 points short. Right: mean band width, TabPFN-3.5 narrower than NESO + conformal at every level](notebooks/calibration.png)
+
+Prior Labs' performance tips, from ratio features and native dates to Thinking mode and per-estimator subsampling, were all tried on 2024 data. None beat the defaults.
 
 ## Live
 
-A [GitHub Action](.github/workflows/live.yml) runs after each of NESO's eight daily updates. It issues TabPFN-3.5's p1–p99 for every hour the update covers and commits them to [`notebooks/public/live.csv`](notebooks/public/live.csv), so the git log holds each forecast before its outturn exists. The [live page](https://csomers3.github.io/tabPFN4wind/) draws outturn, fetched from Elexon on load, under both forecasts. For past hours it shows the last forecast issued before each.
+A scheduled job runs after each of NESO's eight daily updates and commits the new forecast to `notebooks/public/live.csv`, so every forecast is on record before its outcome is known. The [live page](https://csomers3.github.io/tabPFN4wind/) draws it against outturn fetched from Elexon as the page loads.
 
-![The live page: outturn since yesterday under TabPFN-3.5's median inside its p10–p90, p20–p80, p30–p70 and p40–p60 fan and NESO's forecast, each from the last update before the hour, to the end of tomorrow](notebooks/live.png)
+![The live page: outturn since yesterday, TabPFN-3.5's median inside its p10–p90 to p40–p60 fan, and NESO's forecast, to the end of tomorrow](notebooks/live.png)
 
-## Reproduce
+## Run it
 
 Python 3.12 or later.
 
@@ -56,40 +68,29 @@ git clone https://github.com/CSomers3/tabPFN4wind && cd tabPFN4wind
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[tabpfn,notebooks]"
 
-windpfn-score                     # the results table above, offline, from the committed forecasts
-marimo edit notebooks/sample.py   # the whole pipeline on a bundled six-month sample, in about a minute
+windpfn-score                     # the results table above, offline
+marimo edit notebooks/sample.py   # the whole pipeline on a six-month sample, in about a minute
 ```
 
-The sample runs offline with the two references. TabPFN-3.5 runs on Prior Labs' hosted API: to include it, set a token from a Prior Labs account before starting marimo, `export TABPFN_TOKEN=<token>` (PowerShell: `$env:TABPFN_TOKEN = "<token>"`). The sample's context is months, not years, so its scores are a smoke test, not a result.
+The sample runs offline with the two references. To add TabPFN-3.5, which runs on Prior Labs' hosted API, set `TABPFN_TOKEN` to your Prior Labs token before starting marimo.
 
-The notebooks read only from the five modules in [src/windpfn/](src/windpfn): `sources`, `weather`, `dataset`, `forecasting` and `evaluation`.
-
-| | |
-|---|---|
-| [`01_data`](notebooks/01_data.py) | the information set, the target, the benchmark and the cost of NESO's error (raw pulls) |
-| [`02_development`](notebooks/02_development.py) | the 2024 development runs and the test of Prior Labs' guidance (token) |
-| [`03_test`](notebooks/03_test.py) | the held-out results and the README figures, offline |
-| [`04_references`](notebooks/04_references.py) | LightGBM's tuning and the reference scores |
-| [`05_live`](notebooks/05_live.py) | the live chart; [`explorer`](notebooks/explorer.py) is the live page itself |
-
-`windpfn-fetch` pulls every raw input into `data/raw/`, each logged with its URL and sha256. `windpfn-backtest tabpfn` and `windpfn-backtest references` regenerate the held-out forecasts, and `windpfn-live` issues p1–p99 from NESO's newest update (token).
-
-## Data
+The code is five modules in `src/windpfn/`: `sources`, `weather`, `dataset`, `forecasting` and `evaluation`. The notebooks only read from them.
 
 | | |
 |---|---|
-| `data/history/` | every input from 2024-04-01 to 2026-09-30, from Elexon BMRS (WINDFOR vintages, metered wind, wind curtailment, capacity) and ECMWF AIFS via dynamical.org |
-| `data/sample/` | the same for 2026-03-01 → 2026-09-15 |
-| `data/points.csv` | the 20 weather points: capacity-weighted clusters of REPD wind farms |
-| `data/test_forecasts.parquet` | TabPFN-3.5's held-out forecasts on IFS, the frozen test |
-| `data/test_forecasts_aifs.parquet` | the same on AIFS |
-| `data/reference_forecasts.parquet` | LightGBM's and the conformal band's |
+| `01_data` | what is known when, the target, the benchmark and the cost of NESO's error |
+| `02_development` | the 2024 development runs (needs a token) |
+| `03_test` | the held-out results and figures, offline |
+| `04_references` | the LightGBM and conformal references |
+| `05_live` | the live chart |
+
+`windpfn-fetch` pulls every raw input, logging each with its URL and checksum. `windpfn-backtest` regenerates the held-out forecasts, and `windpfn-live` issues a new one. `data/` holds every input since April 2024, the six-month sample, and the committed held-out forecasts.
 
 ## Limitations
 
-- **This is post-processing.** It needs NESO's forecast as an input.
-- **The target is reconstructed.** NESO publishes no unconstrained outturn, so the target is metered wind plus balancing-mechanism curtailment. Self-curtailment at negative prices is missing, in about 3% of hours.
-- **The weather input is coarse**: 20 points, 0.25°, 6-hourly steps, and 10 m wind on AIFS.
-- **The AIFS run came after the IFS score was known**, with no other change.
+- **It post-processes NESO's forecast**, so it needs that forecast as an input.
+- **The target is reconstructed.** NESO publishes no output before curtailment, and wind farms that switch themselves off at negative prices, in about 3% of hours, are missing from it.
+- **The weather input is coarse**: 20 points on a 0.25° grid, 6-hourly, with wind at 10 m.
+- **The AIFS run came after the IFS score was known**, with nothing else changed.
 
 Data: Elexon BMRS, ECMWF AIFS via dynamical.org (CC BY 4.0), REPD (OGL v3.0). Code: MIT.

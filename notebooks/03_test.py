@@ -143,8 +143,8 @@ def _(forecasts, mdates, plt, sources, style):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Calibration and sharpness of the central intervals the deciles give, p40–p60 to p10–p90,
-    against the two reference forecasters from `04`. A forecast should sit on zero on the
+    Calibration and sharpness of the central intervals the deciles give, nominal coverage 20%
+    to 80%, against the conformal reference from `04`. A forecast should sit on zero on the
     left; among those that do, narrower on the right is better.
     """)
     return
@@ -156,8 +156,7 @@ def _(forecasts, plt, sources, style):
     runs_shown = {
         "tabpfn+windfor ifs": ("TabPFN-3.5 · IFS", _p["fan"][2]),
         "tabpfn+windfor aifs": ("TabPFN-3.5 · AIFS", _p["median"]),
-        "conformal": ("NESO + conformal", _p["incumbent"]),
-        "lgbm+windfor": ("LightGBM · AIFS", _p["faint"]),
+        "conformal": ("NESO recalibrated + conformal", _p["incumbent"]),
     }
     levels = [20, 40, 60, 80]
 
@@ -174,9 +173,11 @@ def _(forecasts, plt, sources, style):
     width_ax.set(ylim=(0, 3.5), yticks=[0, 1, 2, 3])
     for _axis in (coverage_ax, width_ax):
         _axis.set(xlim=(12, 88), xticks=levels)
-        _axis.set_xticklabels([f"p{50 - _level // 2}–p{50 + _level // 2}" for _level in levels])
+        _axis.set_xticklabels([f"{_level}%" for _level in levels])
     style.header(coverage_ax, "Coverage minus nominal, percentage points")
     style.header(width_ax, "Mean interval width, GW")
+    for _axis in (coverage_ax, width_ax):
+        _axis.set_xlabel("Nominal coverage of the central interval")
     figure_calibration.legend([style.line(_colour) for _, _colour in runs_shown.values()],
                               [_label for _label, _ in runs_shown.values()], loc="lower right",
                               bbox_to_anchor=(width_ax.get_position().x1, 1.0), ncol=4)

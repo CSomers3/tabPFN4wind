@@ -56,7 +56,7 @@ def _(dataset, forecasting, inputs, os, table):
 
 @app.cell
 def _(evaluation, forecasts, runs):
-    LABELS = {"windfor": "NESO", "conformal": "NESO + conformal band", "lgbm+windfor": "LightGBM", "tabpfn+windfor": "TabPFN-3.5"}
+    LABELS = {"windfor": "NESO", "conformal": "NESO recalibrated + conformal", "lgbm+windfor": "LightGBM", "tabpfn+windfor": "TabPFN-3.5"}
     _, _, _scores = evaluation.scorecard(forecasts, list(runs))
     _scores.loc[["windfor", *runs],["MAE", "ΔMAE", "lo", "hi", "CRPS", "cover80", "winkler80"]].rename(index=LABELS).round(3)
     return (LABELS,)

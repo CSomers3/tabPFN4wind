@@ -1,4 +1,4 @@
-"""Features, TabPFN-3.5, the two reference forecasters, and the monthly backtest driving them.
+"""Features, TabPFN-3.5, the reference forecasters, and the monthly backtest driving them.
 
 Every forecaster maps (features, table, train, test) to deciles q10..q90 in MW, where `train`
 and `test` are boolean masks over the table.
@@ -34,6 +34,7 @@ LGBM_PARAMS = {
     "n_jobs": 4,
     "verbose": -1,
 }
+QRF_PARAMS = {"n_estimators": 200, "min_samples_leaf": 1, "max_features": 0.33, "n_jobs": 4, "random_state": 0}
 
 
 def power_curve(table: pd.DataFrame) -> pd.DataFrame:
@@ -112,6 +113,21 @@ def lightgbm(features, table, train, test, **overrides) -> pd.DataFrame:
         for q in QUANTILES
     ]
     return _to_mw(np.sort(np.column_stack(deciles), axis=1), table, test)
+
+
+def quantile_forest(features, table, train, test, **overrides) -> pd.DataFrame:
+    """Quantile regression forest on capacity factor: deciles of the training targets in each test row's leaves."""
+    from quantile_forest import RandomForestQuantileRegressor
+
+    model = RandomForestQuantileRegressor(**QRF_PARAMS | overrides)
+    model.fit(features[train], (table.y / table.cap)[train])
+    return _to_mw(model.predict(features[test], quantiles=QUANTILES), table, test)
+
+
+REFERENCES = {
+    "lightgbm": ("LightGBM", lightgbm),
+    "qrf": ("Quantile regression forest", quantile_forest),
+}
 
 
 def conformal(features, table, train, test, bins: int = 5) -> pd.DataFrame:

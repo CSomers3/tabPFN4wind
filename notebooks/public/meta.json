@@ -1,33 +1,4 @@
 {
- "freeze": "8e4386d",
- "days": 623,
- "scores": [
-  [
-   "NESO",
-   1022,
-   null
-  ],
-  [
-   "NESO + conformal band",
-   1004,
-   0.792
-  ],
-  [
-   "LightGBM · AIFS",
-   929,
-   0.672
-  ],
-  [
-   "TabPFN-3.5 · IFS",
-   912,
-   0.806
-  ],
-  [
-   "TabPFN-3.5 · AIFS",
-   876,
-   0.819
-  ]
- ],
  "units": [
   "E_ABRTW-1",
   "E_AIRSW-1",

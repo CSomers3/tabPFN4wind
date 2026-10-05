@@ -1,0 +1,6 @@
+.git
+.venv
+data/raw
+data/results
+**/__pycache__
+**/__marimo__

@@ -2,7 +2,7 @@
 
     windpfn-fetch       pull and cache every raw input into data/raw/ (hours the first time)
     windpfn-backtest    regenerate held-out forecasts into data/results/
-    windpfn-score       print the README results table from the committed forecasts, offline
+    windpfn-score       print the README tables from the committed forecasts, offline
     windpfn-page        export the data behind notebooks/explorer.py into notebooks/public/
     windpfn-live        issue the full distribution after NESO's newest update, into notebooks/public/live.csv,
                         from data/history/ and what has been published since
@@ -24,10 +24,13 @@ PUBLIC = sources.ROOT / "notebooks/public"
 LIVE = PUBLIC / "live.csv"
 HELD_OUT = {
     "windfor": "NESO",
-    "conformal": "NESO + conformal band",
-    "lgbm+windfor": "LightGBM · AIFS",
+    "conformal": "NESO recalibrated + conformal interval",
     "tabpfn+windfor ifs": "TabPFN-3.5 · IFS",
     "tabpfn+windfor aifs": "TabPFN-3.5 · AIFS",
+}
+ABLATION = {
+    "tabpfn+windfor aifs": "TabPFN-3.5",
+    **{name: label for name, (label, _) in forecasting.REFERENCES.items()},
 }
 
 
@@ -74,22 +77,53 @@ def _run_references(table, start, end):
     return forecasting.pack(runs)
 
 
+def _run_ablation(table, start, end):
+    """The reference forecasters on TabPFN's exact inputs: weather + WINDFOR."""
+    inputs = forecasting.features(table).join(table.windfor)
+    runs = {
+        name: forecasting.backtest(inputs, table, start, end, forecaster=forecaster)
+        for name, (_, forecaster) in forecasting.REFERENCES.items()
+    }
+    return forecasting.pack(runs)
+
+
+def _run_context(table, start, end):
+    """TabPFN-3.5 and the reference forecasters with each month's context cut to CONTEXT_SIZES rows."""
+    inputs = forecasting.features(table).join(table.windfor)
+    forecasters = {"tabpfn+windfor aifs": forecasting.tabpfn} | {
+        name: forecaster for name, (_, forecaster) in forecasting.REFERENCES.items()
+    }
+    runs = {
+        f"{name} {rows}": forecasting.backtest(
+            inputs, table, start, end, forecaster=forecasting.subsampled(forecaster, rows)
+        )
+        for rows in evaluation.CONTEXT_SIZES
+        for name, forecaster in forecasters.items()
+    }
+    return forecasting.pack(runs)
+
+
+SUBJECTS = {"tabpfn": _run_tabpfn, "references": _run_references, "ablation": _run_ablation, "context": _run_context}
+
+
 def backtest() -> None:
     """Regenerate held-out forecasts into data/results/, never over the committed ones in data/.
 
-    `tabpfn` runs weather-only and weather + WINDFOR on the day-ahead table, each refit monthly
-    and frozen, on the hosted API (needs a tabpfn-client token). `references` runs LightGBM and
-    conformal locally.
+    Reads the committed inputs in data/history/. `tabpfn` runs weather-only and weather + WINDFOR
+    on the day-ahead table, each refit monthly and frozen, on the hosted API (needs a tabpfn-client
+    token). `references` runs LightGBM and conformal, `ablation` LightGBM and a quantile regression
+    forest on TabPFN's inputs, both locally. `context` reruns TabPFN-3.5 (hosted) and those two with
+    the context subsampled.
     """
     parser = _parser(backtest.__doc__)
-    parser.add_argument("subject", choices=["tabpfn", "references"])
+    parser.add_argument("subject", choices=list(SUBJECTS))
     parser.add_argument("--start", default=evaluation.TEST_START)
     parser.add_argument("--end", default=evaluation.TEST_END)
     args = parser.parse_args()
 
-    table = forecasting.add_baselines(dataset.build(sources.ARCHIVE_START, args.end))
-    run = _run_tabpfn if args.subject == "tabpfn" else _run_references
-    forecasts = run(table, args.start, args.end)
+    inputs = dataset.load(dataset.HISTORY)
+    table = forecasting.add_baselines(dataset.build(sources.ARCHIVE_START, args.end, inputs))
+    forecasts = SUBJECTS[args.subject](table, args.start, args.end)
 
     RESULTS.mkdir(exist_ok=True)
     out = RESULTS / f"{args.subject}_{args.start}_{args.end}.parquet"
@@ -98,28 +132,30 @@ def backtest() -> None:
 
 
 def score() -> None:
-    """Print the README's held-out results from the committed forecasts. Offline: no raw data, no token."""
+    """Print the README's held-out tables from the committed forecasts. Offline: no raw data, no token."""
     _parser(score.__doc__).parse_args()
     sys.stdout.reconfigure(encoding="utf-8")  # "ΔMAE" on a Windows console
     forecasts = evaluation.load_forecasts()
-    _, _, table = evaluation.scorecard(forecasts, list(HELD_OUT)[1:])
+    _, errors, table = evaluation.scorecard(forecasts, [*list(HELD_OUT)[1:], *list(ABLATION)[1:]])
     days = forecasts.index.floor("D").nunique()
-    print(f"{forecasts.index[0]:%Y-%m-%d} to {forecasts.index[-1]:%Y-%m-%d}: {days} days, {len(forecasts)} hours, MW\n")
+    print(f"{forecasts.index[0]:%Y-%m-%d} to {forecasts.index[-1]:%Y-%m-%d}: {days} days, {len(forecasts)} hours, MW")
     columns = ["MAE", "ΔMAE", "lo", "hi", "CRPS", "cover80", "winkler80"]
-    print(table.loc[list(HELD_OUT), columns].rename(index=HELD_OUT).round(3).to_string())
+    print("\nResults\n" + table.loc[list(HELD_OUT), columns].rename(index=HELD_OUT).round(3).to_string())
+    versus = evaluation.point_scores(errors[list(ABLATION)], reference="tabpfn+windfor aifs")[["ΔMAE", "lo", "hi"]]
+    ablation = table.loc[list(ABLATION), ["MAE", "CRPS", "cover80", "winkler80"]].join(versus.add_suffix(" vs TabPFN"))
+    print("\nAblation, identical AIFS inputs\n" + ablation.rename(index=ABLATION).round(3).to_string())
+    scaling = evaluation.context_scaling(forecasts).rename(columns=ABLATION)
+    print("\nMAE by context rows\n" + scaling.round(0).to_string())
 
 
 def page() -> None:
     """Export the data behind notebooks/explorer.py, which runs under Pyodide without windpfn.
 
-    Writes notebooks/public/meta.json: the held-out scores against the baselines, the wind units whose
-    curtailment the page adds to live outturn, and the map of wind farms and weather points.
+    Writes notebooks/public/meta.json: the wind units whose curtailment the page adds to live outturn,
+    and the map of wind farms and weather points.
     `windpfn-live` writes live.csv beside it.
     """
     _parser(page.__doc__).parse_args()
-    forecasts = evaluation.load_forecasts()
-    _, _, scores = evaluation.scorecard(forecasts, list(HELD_OUT)[1:])
-
     countries = sources.get_json("naturalearth", weather.NATURAL_EARTH)["features"]
     outline = [
         [[round(lon, 2), round(lat, 2)] for lon, lat in polygon[0]]
@@ -132,12 +168,6 @@ def page() -> None:
     points = weather.POINTS
 
     meta = {
-        "freeze": evaluation.FREEZE_COMMIT,
-        "days": int(forecasts.index.floor("D").nunique()),
-        "scores": [
-            [label, round(scores.MAE[name]), None if pd.isna(scores.cover80[name]) else round(scores.cover80[name], 3)]
-            for name, label in HELD_OUT.items()
-        ],
         "units": sorted(sources.wind_units().index),
         "outline": outline,
         "farms": [[round(x, 3), round(y, 3), round(mw)] for x, y, mw in zip(lon, lat, farms.mw)],

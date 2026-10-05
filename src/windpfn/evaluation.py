@@ -16,6 +16,9 @@ FREEZE_COMMIT = "8e4386d"
 TEST_START, TEST_END = "2025-01-01", "2026-09-15"
 
 WEATHER = {"ifs": "test_forecasts.parquet", "aifs": "test_forecasts_aifs.parquet"}
+ABLATION = "ablation_forecasts.parquet"  # the reference forecasters on the AIFS run's exact inputs
+CONTEXT = "context_forecasts.parquet"  # the same, and TabPFN-3.5, with the context subsampled
+CONTEXT_SIZES = [250, 500, 1000, 2000, 4000]
 PROBABILISTIC = [
     "conformal",
     "lgbm",
@@ -77,7 +80,7 @@ def load_forecasts() -> pd.DataFrame:
     frames = {weather: pd.read_parquet(sources.DATA / name) for weather, name in WEATHER.items()}
     tabpfn = {f"{run} {weather}": deciles for weather, frame in frames.items() for run, deciles in forecasting.unpack(frame).items()}
     columns = frames["ifs"].drop(columns=frames["ifs"].filter(like="|").columns)
-    references = pd.read_parquet(sources.DATA / "reference_forecasts.parquet")
+    references = [pd.read_parquet(sources.DATA / name) for name in ("reference_forecasts.parquet", ABLATION, CONTEXT)]
     return columns.join(forecasting.pack(tabpfn)).join(references)
 
 
@@ -90,3 +93,14 @@ def scorecard(forecasts: pd.DataFrame, names=PROBABILISTIC):
     table = point_scores(errors).join(probabilistic_scores(deciles, forecasts.y).astype(float))
     table["CRPS"] = table.CRPS.fillna(table.MAE)
     return deciles, errors, table
+
+
+def context_scaling(forecasts: pd.DataFrame) -> pd.DataFrame:
+    """MAE of each forecaster's median by context rows, the full monthly context last."""
+    names = ["tabpfn+windfor aifs", *forecasting.REFERENCES]
+    full = {name: forecasts[f"{name}|q50"] for name in names}
+    rows = {size: {name: forecasts[f"{name} {size}|q50"] for name in names} for size in CONTEXT_SIZES}
+    medians = {**rows, "all": full}
+    return pd.DataFrame(
+        {name: {size: (run[name] - forecasts.y).abs().mean() for size, run in medians.items()} for name in names}
+    ).rename_axis("context rows")

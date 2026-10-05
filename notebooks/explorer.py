@@ -138,7 +138,6 @@ def _():
     .page {{ color: {P["ink"]}; font: 14px/1.5 {FONT}; }}
     .page h1 {{ font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
                 margin: 4px 0 10px; color: {P["ink"]}; }}
-    .page .subhead {{ font-size: 15px; font-weight: 600; margin: 0 0 8px; color: {P["ink"]}; }}
     .page .lede {{ color: {P["ink2"]}; font-size: 15px; max-width: 620px; margin: 0; }}
     .bar {{ display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
             gap: 8px 24px; margin-top: 8px; font-size: 13px; color: {P["muted"]}; }}
@@ -166,22 +165,11 @@ def _():
     .chart .tip .title, .chart .tip .value {{ fill: {P["ink"]}; font-weight: 500; }}
     .chart .tip .title {{ font-weight: 600; }}
     .chart .tip .note {{ font-size: 10.5px; }}
-    .inputs {{ display: flex; flex-wrap: wrap; gap: 24px 48px; align-items: flex-start; margin-top: 36px;
+    .inputs {{ display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: flex-end; margin-top: 28px;
                padding-top: 24px; border-top: 1px solid {P["rule2"]}; }}
-    .inputs .text {{ flex: 1 1 320px; max-width: 560px; color: {P["ink2"]}; font-size: 14px; }}
-    .inputs ol {{ margin: 0 0 16px; padding-left: 20px; list-style: decimal; }}
-    .inputs li::marker {{ color: {P["faint"]}; }}
-    .inputs li {{ margin-bottom: 6px; }}
-    .inputs b {{ color: {P["ink"]}; font-weight: 600; }}
     .inputs .map text {{ font: 11px {FONT}; fill: {P["muted"]}; }}
-    .scores {{ flex: 0 1 560px; width: 100%; height: auto; font: 12px {FONT}; font-variant-numeric: tabular-nums; }}
-    .scores text {{ fill: {P["ink2"]}; }}
-    .scores text.head {{ fill: {P["ink"]}; font-weight: 600; }}
-    .scores text.ours {{ fill: {P["ink"]}; font-weight: 600; }}
-    .scores text.value {{ fill: {P["ink"]}; }}
-    .scores text.note {{ fill: {P["muted"]}; font-size: 10.5px; }}
-    .inputs .text p + p {{ margin-top: 10px; }}
-    .credit {{ color: {P["muted"]}; font-size: 12px; margin-top: 12px; }}
+    .credit {{ flex: 1 1 280px; color: {P["muted"]}; font-size: 12px; margin: 0; }}
+    .credit a {{ color: {P["accent"]}; }}
     """
     return CSS, P
 
@@ -208,7 +196,7 @@ def _(P, np, pd):
             rows.append(("Outturn", f"{gw(observed[t])} GW"))
         if pd.notna(forecast.q50.get(t)):
             row = forecast.loc[t]
-            rows += [("Median", f"{gw(row.q50)} GW"), ("p10–p90", f"{gw(row.q10)}–{gw(row.q90)} GW"),
+            rows += [("Median", f"{gw(row.q50)} GW"), ("80% interval", f"{gw(row.q10)}–{gw(row.q90)} GW"),
                      ("NESO", f"{gw(incumbent.generation[t])} GW")]
             notes.append(f"Both from NESO's {incumbent.published[t]:%a %H:%M} UTC update")
         width, height = 200, 34 + 18 * len(rows) + 15 * len(notes) + (4 if notes else 0)
@@ -353,36 +341,7 @@ def _(P, np, pd):
         out.append(f'<text x="{W - 86}" y="{54}">wind farm</text>')
         return f'<svg class="map" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
 
-    def scores(meta, W: int = 560) -> str:
-        """Held-out mean error and p10–p90 coverage, TabPFN-3.5 against NESO and the two baselines."""
-        label, panel, gap, row, top = 150, 170, 40, 30, 30
-        mae_x, cover_x = label, label + panel + gap
-        bottom = top + row * len(meta.scores)
-        H = bottom + 16
-        colours = {"NESO": P["incumbent"], "NESO + conformal band": P["incumbent"]}
-        out = [f'<text x="{mae_x}" y="12" class="head">Mean error, MW</text>',
-               f'<text x="{cover_x}" y="12" class="head">Hours inside p10–p90</text>']
-        target = cover_x + 0.8 * panel
-        out.append(f'<line x1="{target:.1f}" x2="{target:.1f}" y1="{top}" y2="{bottom}" stroke="{P["ink2"]}" '
-                   f'stroke-dasharray="3 3"/>')
-        out.append(f'<text x="{target:.1f}" y="{H - 2}" text-anchor="middle" class="note">80% target</text>')
-        for k, (name, mae, cover) in enumerate(meta.scores):
-            ours = name.startswith("TabPFN")
-            y, colour = top + row * k, P["accent"] if ours else colours.get(name, P["faint"])
-            weight = ' class="ours"' if ours else ""
-            out.append(f'<text x="0" y="{y + 15}"{weight}>{name}</text>')
-            width = mae / 1200 * panel
-            out.append(f'<rect x="{mae_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
-            out.append(f'<text x="{mae_x + width + 6:.1f}" y="{y + 15}" class="value">{mae:,}</text>')
-            if cover is None:
-                out.append(f'<text x="{cover_x}" y="{y + 15}" class="note">point forecast only</text>')
-                continue
-            width = cover * panel
-            out.append(f'<rect x="{cover_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
-            out.append(f'<text x="{W}" y="{y + 15}" text-anchor="end" class="value">{cover:.0%}</text>')
-        return f'<svg class="scores" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
-
-    return chart, scores, sites
+    return chart, sites
 
 
 @app.cell(hide_code=True)
@@ -391,9 +350,8 @@ def _(CSS, mo):
     <style>{CSS}</style>
     <header class="page">
       <h1>Great Britain wind power</h1>
-      <p class="lede">TabPFN-3.5's forecast of wind output as a full probability distribution,
-      against the grid operator's own. Past hours show the last forecast issued before each,
-      so outturn can be read against both.</p>
+      <p class="lede">Outturn, the TabPFN-3.5 median with its 20–80% central intervals, and the NESO
+      forecast, hourly, from yesterday to the end of tomorrow.</p>
     </header>
     """)
     return
@@ -424,47 +382,13 @@ def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
 
 
 @app.cell(hide_code=True)
-def _(meta, mo, scores):
-    _scores = {label: (mae, cover) for label, mae, cover in meta.scores}
-    _neso, _ifs, _aifs, _lgbm = (_scores[k] for k in ("NESO", "TabPFN-3.5 · IFS", "TabPFN-3.5 · AIFS", "LightGBM · AIFS"))
-    mo.Html(f"""
-    <div class="page inputs">
-      {scores(meta)}
-      <div class="text">
-        <p class="subhead">Held out: {meta.days} days, 2025–26</p>
-        <p>NESO's forecast missed by {_neso[0]:,} MW on average. TabPFN-3.5's median missed by
-        <b>{_ifs[0]:,} MW</b> on ECMWF IFS weather and <b>{_aifs[0]:,} MW</b> on AIFS, the archive
-        this page runs on: {1 - _ifs[0] / _neso[0]:.0%} and {1 - _aifs[0] / _neso[0]:.0%} less. Its
-        p10–p90 held {_ifs[1]:.0%} and {_aifs[1]:.0%} of hours with no calibration step. A LightGBM
-        tuned on the same AIFS inputs missed by {_lgbm[0]:,} MW, and its p10–p90 held {_lgbm[1]:.0%}.</p>
-        <p>What the day-ahead forecast misses is made good in real time, from reserve plant or by
-        turning generation down. NESO spent £2.3bn balancing Britain's grid in 2025, and its wind
-        forecast missed by 9.4 TWh. Priced at the gap between imbalance and market prices, each
-        tenth of that miss costs about £20m a year, and it grows with every gigawatt of wind built.</p>
-      </div>
-    </div>
-    """)
-    return
-
-
-@app.cell(hide_code=True)
 def _(meta, mo, sites):
     mo.Html(f"""
     <div class="page inputs">
       {sites(meta)}
-      <div class="text">
-        <p class="subhead">What each forecast reads</p>
-        <ol>
-          <li>NESO's forecast, fifteen minutes after each of its updates.</li>
-          <li>ECMWF AIFS's newest 10 m wind at the <b>20 points</b> on the map, each the
-          capacity-weighted centre of the wind farms around it.</li>
-          <li>Every settled hour of outturn since April 2024, as context. TabPFN-3.5 is not
-          trained or tuned for this: each forecast is one forward pass.</li>
-        </ol>
-        <p class="credit">Outturn is metered transmission wind plus balancing-mechanism curtailment,
-        hour ending · Data: Elexon BMRS, ECMWF AIFS via dynamical.org (CC BY 4.0), REPD (OGL v3.0) ·
-        Protocol frozen at {meta.freeze}</p>
-      </div>
+      <p class="credit">Weather read at the 20 capacity-weighted points ·
+      Contains BMRS data © Elexon Limited copyright and database right 2026 · ECMWF AIFS via dynamical.org (CC BY 4.0) · REPD (OGL v3.0) ·
+      <a href="https://github.com/CSomers3/tabPFN4wind">Method and results</a></p>
     </div>
     """)
     return

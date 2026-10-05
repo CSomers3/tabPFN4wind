@@ -117,7 +117,6 @@ def _():
     P = {
         "bg": "#FFFFFF",
         "past": "#F5F7FA",
-        "land": "#EEF2F6",
         "ink": "#0F172A",
         "ink2": "#475569",
         "muted": "#64748B",
@@ -126,7 +125,6 @@ def _():
         "outturn": "#0F172A",
         "incumbent": "#C2255C",
         "accent": "#1F5FAD",
-        "onshore": "#7FAADF",
         "faint": "#94A3B8",
         "fan": ["#DCE7F4", "#C1D4EC", "#A6C2E4", "#8BAFDC"],
     }
@@ -165,10 +163,15 @@ def _():
     .chart .tip .title, .chart .tip .value {{ fill: {P["ink"]}; font-weight: 500; }}
     .chart .tip .title {{ font-weight: 600; }}
     .chart .tip .note {{ font-size: 10.5px; }}
-    .inputs {{ display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: flex-end; margin-top: 28px;
-               padding-top: 24px; border-top: 1px solid {P["rule2"]}; }}
-    .inputs .map text {{ font: 11px {FONT}; fill: {P["muted"]}; }}
-    .credit {{ flex: 1 1 280px; color: {P["muted"]}; font-size: 12px; margin: 0; }}
+    .notes {{ color: {P["ink2"]}; max-width: 620px; margin: 4px 0 16px; }}
+    .notes b {{ color: {P["ink"]}; font-weight: 600; }}
+    .scores {{ display: block; max-width: 600px; width: 100%; height: auto; font: 12px {FONT};
+               font-variant-numeric: tabular-nums; }}
+    .scores text {{ fill: {P["ink2"]}; }}
+    .scores text.head, .scores text.ours, .scores text.value {{ fill: {P["ink"]}; }}
+    .scores text.head, .scores text.ours {{ font-weight: 600; }}
+    .scores text.note {{ fill: {P["muted"]}; font-size: 10.5px; }}
+    .credit {{ color: {P["muted"]}; font-size: 12px; margin: 8px 0 0; }}
     .credit a {{ color: {P["accent"]}; }}
     """
     return CSS, P
@@ -311,37 +314,36 @@ def _(P, np, pd):
             )
         return f'<svg class="chart" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
 
-    def sites(meta, W: int = 230) -> str:
-        """GB wind farms, and the 20 capacity-weighted points whose weather TabPFN-3.5 reads."""
-        west, east, south, north = -8.2, 2.3, 49.9, 59.1
-        squash = np.cos(np.radians((south + north) / 2))
-        scale = W / ((east - west) * squash)
-        H = round((north - south) * scale)
+    def scores(meta, W: int = 600) -> str:
+        """Held-out MAE and 80% interval coverage, TabPFN-3.5 against NESO and the references."""
+        label, panel, gap, row, top = 190, 170, 40, 30, 30
+        mae_x, cover_x = label, label + panel + gap
+        bottom = top + row * len(meta.scores)
+        H = bottom + 16
+        out = [f'<text x="{mae_x}" y="12" class="head">MAE, MW</text>',
+               f'<text x="{cover_x}" y="12" class="head">Hours inside 80% interval</text>']
+        target = cover_x + 0.8 * panel
+        out.append(f'<line x1="{target:.1f}" x2="{target:.1f}" y1="{top}" y2="{bottom}" stroke="{P["ink2"]}" '
+                   f'stroke-dasharray="3 3"/>')
+        out.append(f'<text x="{target:.1f}" y="{H - 2}" text-anchor="middle" class="note">80% target</text>')
+        for k, (name, mae, cover) in enumerate(meta.scores):
+            ours = name.startswith("TabPFN")
+            y = top + row * k
+            colour = P["accent"] if ours else P["incumbent"] if name == "NESO" else P["faint"]
+            weight = ' class="ours"' if ours else ""
+            out.append(f'<text x="0" y="{y + 15}"{weight}>{name}</text>')
+            width = mae / 1200 * panel
+            out.append(f'<rect x="{mae_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
+            out.append(f'<text x="{mae_x + width + 6:.1f}" y="{y + 15}" class="value">{mae:,}</text>')
+            if cover is None:
+                out.append(f'<text x="{cover_x}" y="{y + 15}" class="note">point forecast only</text>')
+                continue
+            width = cover * panel
+            out.append(f'<rect x="{cover_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
+            out.append(f'<text x="{W}" y="{y + 15}" text-anchor="end" class="value">{cover:.0%}</text>')
+        return f'<svg class="scores" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
 
-        def xy(lon, lat):
-            return (lon - west) * squash * scale, (north - lat) * scale
-
-        out = []
-        for ring in meta.outline:
-            d = "M" + "L".join(f"{x:.1f},{y:.1f}" for x, y in (xy(lon, lat) for lon, lat in ring)) + "Z"
-            out.append(f'<path d="{d}" fill="{P["land"]}" stroke="{P["rule"]}" stroke-width=".6"/>')
-        for lon, lat, mw in meta.farms:
-            x, y = xy(lon, lat)
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{np.sqrt(mw) / 9:.2f}" fill="{P["faint"]}" fill-opacity=".55"/>')
-        for lon, lat, mw, offshore in sorted(meta.points, key=lambda point: -point[2]):
-            x, y = xy(lon, lat)
-            colour = P["accent"] if offshore else P["onshore"]
-            out.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{np.sqrt(mw) / 6:.1f}" fill="{colour}" '
-                       f'stroke="{P["bg"]}" stroke-width="1.5"/>')
-        key = [(P["accent"], "offshore point"), (P["onshore"], "onshore point")]
-        for k, (colour, label) in enumerate(key):
-            out.append(f'<circle cx="{W - 96}" cy="{14 + 18 * k}" r="5" fill="{colour}"/>')
-            out.append(f'<text x="{W - 86}" y="{18 + 18 * k}">{label}</text>')
-        out.append(f'<circle cx="{W - 96}" cy="{50}" r="2" fill="{P["faint"]}"/>')
-        out.append(f'<text x="{W - 86}" y="{54}">wind farm</text>')
-        return f'<svg class="map" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
-
-    return chart, sites
+    return chart, scores
 
 
 @app.cell(hide_code=True)
@@ -382,15 +384,33 @@ def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
 
 
 @app.cell(hide_code=True)
-def _(meta, mo, sites):
-    mo.Html(f"""
-    <div class="page inputs">
-      {sites(meta)}
-      <p class="credit">Weather read at the 20 capacity-weighted points ·
-      Contains BMRS data © Elexon Limited copyright and database right 2026 · ECMWF AIFS via dynamical.org (CC BY 4.0) · REPD (OGL v3.0) ·
-      <a href="https://github.com/CSomers3/tabPFN4wind">Method and results</a></p>
+def _(meta, mo, scores):
+    _scores = {name: (mae, cover) for name, mae, cover in meta.scores}
+    _ours, _neso, _lgbm, _qrf = (_scores[k] for k in ("TabPFN-3.5", "NESO", "LightGBM", "Quantile regression forest"))
+    _benchmark = mo.Html(f"""
+    <div class="page">
+      <p class="notes">Over {meta.days} held-out days, TabPFN-3.5 missed by <b>{_ours[0]:,} MW</b> on average,
+      NESO by {_neso[0]:,}. Its 80% interval held {_ours[1]:.0%} of hours, with no calibration step.
+      LightGBM and a quantile forest on the same inputs come close on the median, but their intervals
+      held {_lgbm[1]:.0%} and {_qrf[1]:.0%}.</p>
+      {scores(meta)}
     </div>
     """)
+    _method = mo.Html("""
+    <div class="page">
+      <p class="notes">Fifteen minutes after each NESO update, TabPFN-3.5 reads that forecast, ECMWF AIFS
+      10 m wind at 20 capacity-weighted points, and every settled hour since April 2024. One forward
+      pass, no training.</p>
+    </div>
+    """)
+    mo.vstack([
+        mo.accordion({"Benchmark": _benchmark, "How it works": _method}),
+        mo.Html("""
+        <p class="page credit">Contains BMRS data © Elexon Limited copyright and database right 2026 ·
+        ECMWF AIFS via dynamical.org (CC BY 4.0) · REPD (OGL v3.0) ·
+        <a href="https://github.com/CSomers3/tabPFN4wind">Method and results</a></p>
+        """),
+    ])
     return
 
 

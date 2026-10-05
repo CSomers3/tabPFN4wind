@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "windpfn"
 version = "1.0.0"
 description = "Day-ahead GB wind forecasts from TabPFN-3.5, scored against NESO's WINDFOR"
-license = "MIT"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 # Pinned to the versions the held-out results were produced with.
 dependencies = [
@@ -26,6 +26,7 @@ dependencies = [
 
 [project.optional-dependencies]
 tabpfn = ["tabpfn-client==0.6.0"]
+references = ["quantile-forest==1.4.2"]
 notebooks = ["marimo>=0.24.0"]
 
 [project.scripts]

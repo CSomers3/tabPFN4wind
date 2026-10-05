@@ -6,11 +6,11 @@ TabPFN-3.5 post-processes the system operator's day-ahead wind forecast from pub
 On 623 held-out days, the median forecast has 11% lower mean absolute error than NESO's (912 vs 1,022 MW), and the 80% interval holds 80.6% of hours.
 Live since October 2026, after every NESO update: **[csomers3.github.io/tabPFN4wind](https://csomers3.github.io/tabPFN4wind/)**
 
-Wind supplied a third of Great Britain's electricity in 2025, and the grid is scheduled a day ahead on NESO's forecast of it. That forecast missed by 9.4 TWh in 2025, a year in which balancing the grid cost £2.3bn. Each 10% cut in the miss is worth about £20m a year at the gap between imbalance and market prices.
+Wind supplies a third of Great Britain's electricity, and the grid is scheduled a day ahead on NESO's forecast of it. Any misses in the forecast can result in costly balancing actions, which ultimately inflate the cost of energy for consumers (~£1.5B in 2025, see **[https://wastedwind.energy/](https://wastedwind.energy/)**). NESO has been making strides in forecasting advancements to the UK grid partnering with OpenClimateFix **[see here](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room)**. We used residual correction of NESO's own published forecast to enhance it using AI forecasting. 
 
 ## Results
 
-Held out: 2025-01-01 to 2026-09-15, 14,952 hours, scored once under the protocol frozen at commit [`8e4386d`](../../commit/8e4386d). All intervals are central intervals of the predictive distribution.
+Held out: 2025-01-01 to 2026-09-15, 14,952 hours, scored once under the frozen protocol frozen. All intervals are central intervals of the predictive distribution.
 
 | MW | MAE | ΔMAE vs NESO [95% CI] | CRPS | 80% interval coverage | Winkler |
 |---|---|---|---|---|---|

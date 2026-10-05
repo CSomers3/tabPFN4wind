@@ -1,4 +1,4 @@
-![Using tabular foundation models to upgrade the grid: an isometric line drawing of offshore and onshore wind turbines feeding a town](.github/hero.svg)
+![Line drawing of an offshore wind farm; cartoon wind curls sweep across and the turbines speed up as each one passes](.github/hero.svg)
 
 ## Why it matters
 

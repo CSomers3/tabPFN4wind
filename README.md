@@ -1,4 +1,4 @@
-![Using tabular foundation models to upgrade the grid: an isometric scene of offshore and onshore wind turbines feeding a town, with a probabilistic forecast above it](.github/hero.svg)
+![Using tabular foundation models to upgrade the grid: an isometric line drawing of offshore and onshore wind turbines feeding a town](.github/hero.svg)
 
 ## Why it matters
 

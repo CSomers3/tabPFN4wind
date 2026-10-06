@@ -143,8 +143,9 @@ def _(forecasts, mdates, plt, sources, style):
 def _(mo):
     mo.md(r"""
     Calibration and sharpness of the central intervals the deciles give, nominal coverage 20%
-    to 80%, against the conformal reference from `04`. A forecast should sit on zero on the
-    left; among those that do, narrower on the right is better.
+    to 80%, on identical AIFS inputs: TabPFN-3.5, the tuned LightGBM and quantile regression
+    forest from `04`, and the conformal reference. A forecast should sit on zero on the left;
+    among those that do, narrower on the right is better.
     """)
     return
 
@@ -153,10 +154,12 @@ def _(mo):
 def _(forecasts, plt, sources, style):
     _p = style.PALETTE
     runs_shown = {
-        "tabpfn+windfor ifs": ("TabPFN-3.5 · IFS", _p["fan"][2]),
-        "tabpfn+windfor aifs": ("TabPFN-3.5 · AIFS", _p["median"]),
+        "lightgbm": ("LightGBM", _p["faint"]),
+        "qrf": ("Quantile forest", _p["faint"]),
         "conformal": ("NESO recalibrated + conformal", _p["incumbent"]),
+        "tabpfn+windfor aifs": ("TabPFN-3.5", _p["median"]),
     }
+    references = ("lightgbm", "qrf")
     levels = [20, 40, 60, 80]
 
     figure_calibration, (coverage_ax, width_ax) = plt.subplots(1, 2, figsize=(style.WIDTH, 2.3), gridspec_kw={"wspace": 0.22})
@@ -166,10 +169,16 @@ def _(forecasts, plt, sources, style):
         _coverage = [100 * forecasts.y.between(_low, _high).mean() - _level for _low, _high, _level in zip(_lower, _upper, levels)]
         _width = [(_high - _low).mean() / 1e3 for _low, _high in zip(_lower, _upper)]
         for _axis, _values in ((coverage_ax, _coverage), (width_ax, _width)):
-            _axis.plot(levels, _values, color=_colour, marker="o", ms=4, mec=_p["bg"], mew=1.2)
+            _axis.plot(levels, _values, color=_colour, marker="o", ms=4, mec=_p["bg"], mew=1.2,
+                       lw=0.9 if _run in references else 1.4)
+            if _run in references:
+                _at, _side = (3, "right") if _axis is coverage_ax else (2, "right" if _run == "qrf" else "left")
+                _up = _axis is width_ax and _run == "qrf"
+                _axis.annotate(_label, (levels[_at], _values[_at]), xytext=(-3 if _side == "right" else 3, 7 if _up else -7),
+                               textcoords="offset points", ha=_side, va="center", color=_p["muted"], fontsize=6)
     coverage_ax.axhline(0, color=_p["rule"], lw=0.6)
-    coverage_ax.set(ylim=(-15, 5), yticks=[-15, -10, -5, 0, 5])
-    width_ax.set(ylim=(0, 3.5), yticks=[0, 1, 2, 3])
+    coverage_ax.set(ylim=(-17, 10), yticks=[-15, -10, -5, 0, 5, 10])
+    width_ax.set(ylim=(0, 4), yticks=[0, 1, 2, 3, 4])
     for _axis in (coverage_ax, width_ax):
         _axis.set(xlim=(12, 88), xticks=levels)
         _axis.set_xticklabels([f"{_level}%" for _level in levels])
@@ -177,8 +186,9 @@ def _(forecasts, plt, sources, style):
     style.header(width_ax, "Mean interval width, GW")
     for _axis in (coverage_ax, width_ax):
         _axis.set_xlabel("Nominal coverage of the central interval")
-    figure_calibration.legend([style.line(_colour) for _, _colour in runs_shown.values()],
-                              [_label for _label, _ in runs_shown.values()], loc="lower right",
+    _legend = {"tabpfn+windfor aifs": "TabPFN-3.5", "conformal": "NESO recalibrated + conformal", "lightgbm": "References"}
+    figure_calibration.legend([style.line(runs_shown[_run][1], 1.4 if _run == "tabpfn+windfor aifs" else 0.9) for _run in _legend],
+                              list(_legend.values()), loc="lower right",
                               bbox_to_anchor=(width_ax.get_position().x1, 1.0), ncol=4)
     figure_calibration.savefig(sources.ROOT / "assets" / "calibration.png")
     figure_calibration

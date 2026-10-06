@@ -1,10 +1,12 @@
 ![Line drawing of an offshore wind farm, with cartoon wind curls sweeping across and the turbines speeding up as each one passes](assets/hero.svg)
 
-# TabPFN-3.5 for Great Britain's day-ahead wind forecast
+# TabPFN-3.5 upgrades Great Britain's day-ahead wind forecast
 
-Wind supplies a third of Great Britain's electricity, and the grid is scheduled a day ahead on the National Energy System Operator's (NESO) forecast of it. When that forecast misses, NESO must take costly balancing actions — costs that ultimately land on consumers, reaching roughly £1.5B in 2025 alone. NESO has been making strides in forecasting, including a partnership with [Open Climate Fix for solar PV](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room). We demonstrate there is still headroom in wind using TabPFN-3.5 to post-process NESO's own published day-ahead forecast via residual correction, relying only on public weather and outturn data with no training, no tuning. On 623 held-out days, our median forecast achieves 11% lower mean absolute error than NESO's (912 vs 1,022 MW), and the 80% interval holds 80.6% of hours. We deploy this probabilistic forecast live and updated eight times a day - see [csomers3.github.io/tabPFN4wind](https://csomers3.github.io/tabPFN4wind/).
+Wind supplies a third of Great Britain's electricity, and the grid is scheduled a day ahead on the National Energy System Operator's (NESO) forecast of it. When that forecast misses, NESO takes costly balancing actions, roughly £1.5B in 2025, that land on consumers. NESO is already improving its forecasting, partnering with [Open Climate Fix for solar PV](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room) on solar PV. Wind has more headroom. TabPFN-3.5 post-processes NESO's published day-ahead forecast, correcting its residuals from public weather and outturn data alone - with no task-specific training or tuning. On 623 held-out days, the median forecast cuts mean absolute error by 11% (912 vs 1,022 MW), and the 80% interval covers 80.6% of hours. 
 
-<p align="center"><a href="https://csomers3.github.io/tabPFN4wind/"><img src="assets/live-page.png" alt="The live page, with outturn since yesterday under the TabPFN-3.5 forecast fan and the NESO forecast, to the end of tomorrow." width="80%"></a></p>
+This forecast runs live, updated eight times a day: [csomers3.github.io/tabPFN4wind](https://csomers3.github.io/tabPFN4wind/).
+
+<p align="center"><a href="https://csomers3.github.io/tabPFN4wind/"><img src="assets/live-page.png" alt="The live page, with outturn since yesterday under the TabPFN-3.5 forecast fan and the NESO forecast, to the end of tomorrow." width="100%"></a></p>
 
 ### Results
 
@@ -58,10 +60,10 @@ TabPFN-3.5 does not need the hand-made power curve. On the raw weather it scores
 
 Each forecast used only what was public at its issue time, 15 minutes after NESO's last update before 08:30 UTC the day before (lead times 16 to 39 h). `dataset.check` enforces this on every row.
 
-- **Weather.** ECMWF 10 m wind every 6 hours at 20 points, one per cluster of wind farms, raised to hub height and mapped through a generic power curve. Direction enters as sin and cos.
-- **NESO's forecast.** The update being post-processed.
-- **Target.** Metered transmission wind plus wind curtailed in the balancing mechanism, as a share of installed capacity. That is what NESO forecasts. Regressed on NESO's forecast its slope is 1.00, against 0.80 for metered output alone.
-- **Context.** Every hour settled at least a day before issue, refit monthly, from 6,944 hours in January 2025 to 21,537 by September 2026.
+- **Weather:** ECMWF 10 m wind every 6 hours at 20 points, one per wind-farm cluster, raised to hub height and mapped through a generic power curve. Direction enters as sin and cos.
+- **NESO's forecast:** The grid operators forecast to be post-processed.
+- **Target:** Metered transmission wind plus wind curtailed in the balancing mechanism, as a share of installed capacity. 
+- **Context:** Every hour settled at least a day before issue, refit monthly, from 6,944 hours in January 2025 to 21,537 by September 2026.
 
 ```python
 model = TabPFNRegressor.create_default_for_version("v3.5")
@@ -69,7 +71,7 @@ model.fit(features[train], (table.y / table.cap)[train])
 deciles = model.predict(features[test], output_type="quantiles", quantiles=QUANTILES)
 ```
 
-The point forecast is the median. The live forecast runs after every NESO update, learns from a 50,000-row sample of all past updates, adds the latest metered output and publishes 99 percentiles.
+The point forecast is the median of the probabilistic output. The live forecast runs after every NESO update, learning from a 50,000-row sample of all past updates.
 
 **Design decisions.** The target is capacity factor, not MW, so the context spans capacity growth. A one-day embargo covers curtailment data whose first publication time is unknown. Weather alone only ties NESO, at 1,026 MW, so NESO's forecast is an input.
 

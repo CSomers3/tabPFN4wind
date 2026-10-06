@@ -1,8 +1,8 @@
 ![Line drawing of an offshore wind farm, with cartoon wind curls sweeping across and the turbines speeding up as each one passes](assets/hero.svg)
 
-# TabPFN upgrades Great Britain's day-ahead wind forecast
+# TabPFN upgrades Great Britain's wind forecast
 
-Wind supplies a third of Great Britain's electricity, and the grid is scheduled a day ahead on the National Energy System Operator's (NESO) forecast of it. When that forecast misses, NESO takes costly balancing actions, roughly £1.5B in 2025, that land on consumers. NESO is already improving its forecasting, partnering with [Open Climate Fix for solar PV](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room) on solar PV. Wind has more headroom. TabPFN-3.5 post-processes NESO's published day-ahead forecast, correcting its residuals from public weather and outturn data alone - with no task-specific training or tuning. On 623 held-out days, the median forecast cuts mean absolute error by 11% (912 vs 1,022 MW), and the 80% interval covers 80.6% of hours. 
+Wind supplies a third of Great Britain's electricity, and the grid is scheduled based on the National Energy System Operator's (NESO) forecast of it. When that forecast misses, NESO is forced to take costly balancing actions, roughly £1.5B in 2025, that land on consumers. NESO is already improving its forecasting, partnering with [Open Climate Fix for solar PV](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room) on solar PV. Wind has more headroom. TabPFN-3.5 post-processes NESO's published day-ahead forecast, correcting its residuals from public weather and outturn data alone - with no task-specific training or tuning. In 2025 alone, this post-process cuts NESO's forecast miss by 1.28 TWh - the yearly electricity use of approximately 470,000 homes while also producing calibrated uncertainty ranges that operators can use in real decisions
 
 This forecast runs live, updated eight times a day: [csomers3.github.io/tabPFN4wind](https://csomers3.github.io/tabPFN4wind/).
 

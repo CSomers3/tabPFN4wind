@@ -35,13 +35,13 @@ CRPS scores the whole distribution and equals MAE for a single forecast. Winkler
 
 **Calibration.** The medians are close, but the distributions are not. TabPFN-3.5's intervals are within 2.5 points of nominal coverage at every level, with no calibration step. LightGBM's are 5 to 14 points short and the forest's 5 to 10 over. The conformal band is on nominal by construction but 10% wider.
 
-![Coverage minus nominal and mean interval width for TabPFN-3.5, LightGBM, the quantile forest and the conformal reference.](assets/calibration.png)
+<p align="center"><img src="assets/calibration.png" alt="Coverage minus nominal and mean interval width for TabPFN-3.5, LightGBM, the quantile forest and the conformal reference." width="80%"></p>
 
 *Coverage minus nominal (left) and mean width (right) of central intervals from 20% to 80%.*
 
 **Less context.** At 250 context rows a month TabPFN-3.5 still beats NESO at 921 MW. LightGBM falls to 1,148 and the forest to 1,051.
 
-![Held-out MAE against context rows per monthly fit, for TabPFN-3.5, the two references and NESO.](assets/scaling.png)
+<p align="center"><img src="assets/scaling.png" alt="Held-out MAE against context rows per monthly fit, for TabPFN-3.5, the two references and NESO." width="80%"></p>
 
 **The defaults were already the best setting.** We tried each of Prior Labs' performance suggestions and raw weather columns on Jul–Dec 2024, where the default scores 805 MW against NESO's 931 ([`02`](notebooks/02_development.py)). None was a reliable gain.
 

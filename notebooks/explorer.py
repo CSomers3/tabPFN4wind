@@ -351,7 +351,7 @@ def _(CSS, mo):
     mo.Html(f"""
     <style>{CSS}</style>
     <header class="page">
-      <h1>Great Britain wind power</h1>
+      <h1>GB Wind Generation</h1>
     </header>
     """)
     return

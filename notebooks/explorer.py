@@ -398,9 +398,9 @@ def _(meta, mo, scores):
     """)
     _method = mo.Html("""
     <div class="page">
-      <p class="notes">Fifteen minutes after each NESO update, TabPFN-3.5 reads that forecast, ECMWF AIFS
-      10 m wind at 20 capacity-weighted points, and every settled hour since April 2024. One forward
-      pass, no training.</p>
+      <p class="notes">Fifteen minutes after each NESO update, TabPFN-3.5 reads that forecast, the latest metered
+      output, ECMWF AIFS 10 m wind at 20 capacity-weighted points, and every settled hour since April
+      2024. One forward pass at default settings: no training, no tuning.</p>
     </div>
     """)
     mo.vstack([

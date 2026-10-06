@@ -66,6 +66,8 @@ def _(mo):
     - `windfor as capacity factor`: WINDFOR divided by capacity, on the target's scale (a ratio feature).
     - `fleet power curve`: the capacity-weighted mean of the 20 point curves (an aggregate).
     - `native datetime`: valid time as a datetime column in place of hour and day-of-year sin/cos.
+    - `raw wind`: the 10 m speeds (m/s) and directions (degrees) as served, in place of the
+      power curves and sin/cos. Added after the test, on this window only.
     - `thinking`: TabPFN-3.5-Thinking, MAE objective, with and without valid time as `time_col`.
       Thinking regression returns only the mean, so it is compared with the standard mean.
 
@@ -75,7 +77,7 @@ def _(mo):
 
 
 @app.cell
-def _(END, START, development, evaluation, features, forecasting, partial, pd, table, weather):
+def _(END, START, dataset, development, evaluation, features, forecasting, partial, pd, table, weather):
     def _mean(features, table, train, test, **settings):
         """TabPFN-3.5's predictive mean, the only output Thinking gives for regression."""
         from tabpfn_client import TabPFNRegressor
@@ -94,6 +96,7 @@ def _(END, START, development, evaluation, features, forecasting, partial, pd, t
         "windfor as capacity factor": (_base.drop(columns="windfor").assign(windfor_cf=table.windfor / table.cap), forecasting.tabpfn),
         "fleet power curve": (_base.assign(fleet_pc=_fleet), forecasting.tabpfn),
         "native datetime": (_timed.drop(columns=["hour", "doy_sin", "doy_cos"]), forecasting.tabpfn),
+        "raw wind": (table[dataset.SPEEDS + dataset.DIRECTIONS + dataset.COVARIATES + ["windfor"]], forecasting.tabpfn),
         "standard, mean": (_base, _mean),
         "thinking, mean": (_base, _thinking),
         "thinking + time_col, mean": (_timed, partial(_thinking, time_col="valid_time")),

@@ -29,10 +29,6 @@ REPD_URL = (
     "https://assets.publishing.service.gov.uk/media/6a6cbdc00c36759b5ccaa305/"
     "REPD_Publication_Q2_2026.csv"
 )
-NATURAL_EARTH = (
-    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/"
-    "ne_50m_admin_0_countries.geojson"
-)
 
 # REPD lists these as under construction, but they already meter in B1610.
 GENERATING_EARLY = {"Dogger Bank A & B": "2023-11-01", "Sofia": "2026-04-22"}

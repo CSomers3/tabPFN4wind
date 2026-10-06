@@ -26,7 +26,7 @@ def _(mo):
     first month's context throughout. `blend` is the fixed 50/50 WINDFOR / power-curve
     benchmark, the bar for `tabpfn+windfor`.
 
-    Produces the two held-out README figures, `miss.png` and `calibration.png`.
+    Draws `assets/miss.png` and `assets/calibration.png`.
     """)
     return
 
@@ -47,9 +47,8 @@ def _():
 @app.cell
 def _(evaluation):
     forecasts = evaluation.load_forecasts()
-    _frozen = [f"tabpfn frozen {weather}" for weather in evaluation.WEATHER]
-    deciles, errors, scores = evaluation.scorecard(forecasts, [*evaluation.PROBABILISTIC, *_frozen])
-    runs = ["windfor", "blend", *[f"{run} {w}" for run in ("tabpfn", "tabpfn+windfor") for w in evaluation.WEATHER]]
+    deciles, errors, scores = evaluation.scorecard(forecasts)
+    runs = ["windfor", "blend", *[f"{run} {w}" for run in ("tabpfn", "tabpfn+windfor", "tabpfn+windfor frozen") for w in evaluation.WEATHER]]
     scores.loc[runs, ["MAE", "RMSE", "bias", "ΔMAE", "lo", "hi"]]
     return deciles, errors, forecasts, runs
 
@@ -135,7 +134,7 @@ def _(forecasts, mdates, plt, sources, style):
     miss_ax.axvline(mdates.datestr2num("2026-01-01"), color=_p["rule2"], lw=0.6)
     style.header(miss_ax, "Cumulative absolute error, TWh", [style.line(_p["incumbent"]), style.line(_p["forecast"])],
                  ["NESO", "TabPFN-3.5"])
-    figure_miss.savefig(sources.ROOT / "notebooks" / "miss.png")
+    figure_miss.savefig(sources.ROOT / "assets" / "miss.png")
     figure_miss
     return
 
@@ -181,7 +180,7 @@ def _(forecasts, plt, sources, style):
     figure_calibration.legend([style.line(_colour) for _, _colour in runs_shown.values()],
                               [_label for _label, _ in runs_shown.values()], loc="lower right",
                               bbox_to_anchor=(width_ax.get_position().x1, 1.0), ncol=4)
-    figure_calibration.savefig(sources.ROOT / "notebooks" / "calibration.png")
+    figure_calibration.savefig(sources.ROOT / "assets" / "calibration.png")
     figure_calibration
     return
 

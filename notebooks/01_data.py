@@ -27,14 +27,30 @@ def _(mo):
 
 @app.cell
 def _():
+    import matplotlib.dates as mdates
     import matplotlib.pyplot as plt
+    import numpy as np
     import pandas as pd
+    from matplotlib.colors import LinearSegmentedColormap
     from sklearn.linear_model import LinearRegression
 
-    from windpfn import dataset, evaluation, forecasting, sources, style
+    from windpfn import dataset, evaluation, forecasting, sources, style, weather
 
     style.use()
-    return LinearRegression, dataset, evaluation, forecasting, pd, plt, sources, style
+    return (
+        LinearRegression,
+        LinearSegmentedColormap,
+        dataset,
+        evaluation,
+        forecasting,
+        mdates,
+        np,
+        pd,
+        plt,
+        sources,
+        style,
+        weather,
+    )
 
 
 @app.cell(hide_code=True)
@@ -109,6 +125,60 @@ def _(mo):
 @app.cell
 def _(dataset, table):
     table[dataset.SPEEDS + dataset.COVARIATES + ["windfor", "y"]].iloc[[0, 12]].T.round(1)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## The weather columns, development and test
+
+    The 20 power-curve columns TabPFN-3.5 reads, daily means, offshore then onshore points,
+    each north to south; above them the target. Reads the committed `data/history/`.
+    """)
+    return
+
+
+@app.cell
+def _(LinearSegmentedColormap, dataset, evaluation, forecasting, mdates, np, pd, plt, sources, style, weather):
+    _p = style.PALETTE
+    _history = dataset.build(sources.ARCHIVE_START, evaluation.TEST_END, dataset.load(dataset.HISTORY))
+    _points = weather.POINTS.assign(offshore=weather.POINTS.index.str.startswith("off"))
+    _order = _points.sort_values(["offshore", "lat"], ascending=False).index
+    _daily = forecasting.power_curve(_history).set_axis(_points.index, axis=1)[_order].resample("D").mean()
+    _outturn = (_history.y / _history.cap).resample("D").mean()
+    _test = pd.Timestamp(evaluation.TEST_START, tz="UTC")
+    _offshore = _points.offshore.sum()
+
+    figure_features, (_top, _heat) = plt.subplots(
+        2, 1, figsize=(style.WIDTH, 3.6), sharex=True, gridspec_kw={"height_ratios": [1, 2.4], "hspace": 0.4}
+    )
+    _top.plot(_outturn, color=_p["outturn"], lw=0.7)
+    _top.set(ylim=(0, 1), yticks=[0, 0.5, 1])
+    _cmap = LinearSegmentedColormap.from_list("fan", [_p["bg"], *_p["fan"], _p["forecast"], _p["median"]])
+    _mesh = _heat.pcolormesh(_daily.index, np.arange(len(_order)), _daily.T.to_numpy(), cmap=_cmap, vmin=0, vmax=1,
+                             shading="nearest", rasterized=True)
+    _heat.grid(False)
+    _heat.axhline(_offshore - 0.5, color=_p["bg"], lw=1.5)
+    _heat.set(ylim=(len(_order) - 0.5, -0.5))
+    _heat.set_yticks([(_offshore - 1) / 2, _offshore + (len(_order) - _offshore - 1) / 2], ["Offshore", "Onshore"])
+    _top.axvline(_test, color=_p["ink2"], lw=0.8)
+    _heat.axvline(_test, color=_p["bg"], lw=1.5)
+    _top.text(_test, 0.93, "  Held-out test →", va="center", color=_p["ink"], fontweight="semibold")
+    _heat.set_xlim(_daily.index[0], _daily.index[-1])
+    _heat.xaxis.set_major_locator(mdates.MonthLocator(bymonth=[1, 4, 7, 10]))
+    _heat.xaxis.set_major_formatter(
+        lambda value, _: mdates.num2date(value).strftime("%b %Y" if mdates.num2date(value).month == 1 else "%b")
+    )
+    style.header(_top, "Outturn, capacity factor, daily mean")
+    style.header(_heat, "Power-curve capacity factor at each weather point, north to south, daily mean")
+    _bar = figure_features.colorbar(_mesh, cax=_heat.inset_axes([0.86, 1.05, 0.14, 0.045]), orientation="horizontal",
+                                    ticks=[0, 0.5, 1])
+    _bar.outline.set_visible(False)
+    _bar.ax.tick_params(labelsize=6, pad=2)
+    _bar.ax.xaxis.set_ticks_position("top")
+    figure_features.savefig(sources.ROOT / "assets" / "features.png")
+    figure_features
     return
 
 

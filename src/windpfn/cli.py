@@ -67,14 +67,9 @@ def _run_tabpfn(table, start, end):
 
 
 def _run_references(table, start, end):
-    features = forecasting.features(table)
-    with_windfor = features.join(table.windfor)
-    runs = {
-        "lgbm": forecasting.backtest(features, table, start, end, forecaster=forecasting.lightgbm),
-        "lgbm+windfor": forecasting.backtest(with_windfor, table, start, end, forecaster=forecasting.lightgbm),
-        "conformal": forecasting.backtest(features, table, start, end, forecaster=forecasting.conformal),
-    }
-    return forecasting.pack(runs)
+    """NESO's forecast recalibrated with a conformal interval: no weather, so no ablation."""
+    conformal = forecasting.backtest(forecasting.features(table), table, start, end, forecaster=forecasting.conformal)
+    return forecasting.pack({"conformal": conformal})
 
 
 def _run_ablation(table, start, end):
@@ -88,7 +83,7 @@ def _run_ablation(table, start, end):
 
 
 def _run_context(table, start, end):
-    """TabPFN-3.5 and the reference forecasters with each month's context cut to CONTEXT_SIZES rows."""
+    """Medians of TabPFN-3.5 and the reference forecasters with each month's context cut to CONTEXT_SIZES rows."""
     inputs = forecasting.features(table).join(table.windfor)
     forecasters = {"tabpfn+windfor aifs": forecasting.tabpfn} | {
         name: forecaster for name, (_, forecaster) in forecasting.REFERENCES.items()
@@ -96,7 +91,7 @@ def _run_context(table, start, end):
     runs = {
         f"{name} {rows}": forecasting.backtest(
             inputs, table, start, end, forecaster=forecasting.subsampled(forecaster, rows)
-        )
+        )[["q50"]]
         for rows in evaluation.CONTEXT_SIZES
         for name, forecaster in forecasters.items()
     }
@@ -111,7 +106,7 @@ def backtest() -> None:
 
     Reads the committed inputs in data/history/. `tabpfn` runs weather-only and weather + WINDFOR
     on the day-ahead table, each refit monthly and frozen, on the hosted API (needs a tabpfn-client
-    token). `references` runs LightGBM and conformal, `ablation` LightGBM and a quantile regression
+    token). `references` runs the conformal reference, `ablation` LightGBM and a quantile regression
     forest on TabPFN's inputs, both locally. `context` reruns TabPFN-3.5 (hosted) and those two with
     the context subsampled.
     """

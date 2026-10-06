@@ -4,7 +4,7 @@
 
 TabPFN-3.5 post-processes the system operator's day-ahead wind forecast from public weather and outturn data, with no training and no tuning.
 On 623 held-out days, the median forecast has 11% lower mean absolute error than NESO's (912 vs 1,022 MW), and the 80% interval holds 80.6% of hours.
-Live since October 2026, updated eight times a day, at **[csomers3.github.io/tabPFN4wind](https://csomers3.github.io/tabPFN4wind/)**
+We deploy this probabilistic forecast live and updated eight times a day - see **[csomers3.github.io/tabPFN4wind](https://csomers3.github.io/tabPFN4wind/)**
 
 Wind supplies a third of Great Britain's electricity, and the grid is scheduled a day ahead on NESO's forecast of it. Any misses in the forecast can result in costly balancing actions, which ultimately inflate the cost of energy for consumers (~£1.5B in 2025, see **[https://wastedwind.energy/](https://wastedwind.energy/)**). NESO has been making strides in forecasting advancements to the UK grid partnering with OpenClimateFix **[see here](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room)**. We used residual correction of NESO's own published forecast to enhance it using AI forecasting. 
 

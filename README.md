@@ -101,10 +101,9 @@ marimo edit notebooks/sample.py   # the whole pipeline on a six-month sample
 
 ### Limitations
 
-- The method post-processes NESO's forecast and needs it as an input.
-- The target is reconstructed. Wind farms that curtail themselves at negative prices, in about 3% of hours, are missing from it.
+- The method post-processes NESO's forecast, not a replacement.
+- The target is reconstructed. Wind farms that curtail themselves at negative prices are missing from it, as this is a farm-level decision.
 - The weather input is coarse, 10 m wind at 20 points on a 0.25° grid every 6 hours.
-- Errors follow the weather forecast. On the eight days TabPFN-3.5 lost most to NESO, 35% to 42% of hours fell inside its 80% interval. During Storm Éowyn (24 January 2025) its daily bias was +2.2 GW against NESO's −0.1 GW.
-- The live configuration has no held-out score.
+- Errors follow the weather forecast. On the eight days TabPFN-3.5 lost most to NESO, 35% to 42% of hours fell inside its 80% interval. During Storm Éowyn (24 January 2025) its daily bias was +2.2 GW against NESO's −0.1 GW, leaving scope for learning physical processes and their limitations (wind turbines are only rated up to a certain wind speed, and must turn off otherwise to prevent damage).
 
 Contains BMRS data © Elexon Limited copyright and database right 2026 · NESO balancing costs, supported by National Energy System Operator Open Data · ECMWF AIFS via dynamical.org (CC BY 4.0) · REPD (OGL v3.0) · Code under [Apache-2.0](LICENSE)

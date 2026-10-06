@@ -23,12 +23,6 @@ TabPFN-3.5 read ECMWF IFS weather in the pre-registered test; the AIFS rerun rep
 
 ## Why TabPFN
 
-**Calibration.** TabPFN-3.5's central intervals are within 2.5 points of nominal coverage at every level, with no calibration step, and its 80% interval is 11% narrower than the conformal one.
-
-![Left: coverage minus nominal, for intervals of nominal coverage 20% to 80%. Right: mean interval width.](assets/calibration.png)
-
-*Coverage minus nominal, for intervals of nominal coverage 20% to 80% (left), and mean interval width (right).*
-
 **Against tuned references.** A quantile LightGBM and a quantile regression forest were given TabPFN-3.5's exact AIFS inputs, context and monthly refits, with hyperparameters chosen by CRPS on Jul–Dec 2024 ([`04`](notebooks/04_references.py)):
 
 | MW | MAE | ΔMAE vs TabPFN-3.5 [95% CI] | CRPS | 80% interval coverage | Winkler |
@@ -37,7 +31,13 @@ TabPFN-3.5 read ECMWF IFS weather in the pre-registered test; the AIFS rerun rep
 | LightGBM | 891 | +16 [−4, +36] | 706 | 66.2% | 4,325 |
 | Quantile regression forest | 901 | +25 [+8, +44] | 713 | 88.0% | 4,279 |
 
-The medians are close; the distributions are not. LightGBM's 80% interval holds 66% of hours and the forest's 88%. With the context cut to 250 rows a month, TabPFN-3.5 still beats NESO, at 921 MW; LightGBM falls to 1,148 and the forest to 1,051.
+**Calibration.** The medians are close; the distributions are not. On these identical inputs, TabPFN-3.5's central intervals are within 2.5 points of nominal coverage at every level, with no calibration step. LightGBM's fall 5 to 14 points short and the forest's run 5 to 10 over. The conformal band, calibrated by construction on NESO's own errors, sits on nominal but is 10% wider than TabPFN-3.5's at 80%.
+
+![Left: coverage minus nominal, for intervals of nominal coverage 20% to 80%. Right: mean interval width. TabPFN-3.5, LightGBM, the quantile forest and the conformal reference, on identical inputs.](assets/calibration.png)
+
+*Coverage minus nominal, for intervals of nominal coverage 20% to 80% (left), and mean interval width (right).*
+
+**Less context.** With the context cut to 250 rows a month, TabPFN-3.5 still beats NESO, at 921 MW; LightGBM falls to 1,148 and the forest to 1,051.
 
 ![Held-out MAE against context rows per monthly fit, for TabPFN-3.5, the two references and NESO.](assets/scaling.png)
 

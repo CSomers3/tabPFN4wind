@@ -1,6 +1,6 @@
 """Scoring, and the committed held-out forecasts it runs on. Everything here is in MW.
 
-The held-out window was scored once, under the protocol frozen at FREEZE_COMMIT, with ECMWF IFS
+The held-out window was scored once, under the protocol frozen at 8e4386d, with ECMWF IFS
 weather. TabPFN was then rerun unchanged on the AIFS archive the package reads. Both sets of
 forecasts are committed in data/, so the scorecard rebuilds offline without raw pulls or a token.
 """
@@ -12,17 +12,14 @@ import pandas as pd
 
 from windpfn import forecasting, sources
 
-FREEZE_COMMIT = "8e4386d"
 TEST_START, TEST_END = "2025-01-01", "2026-09-15"
 
 WEATHER = {"ifs": "test_forecasts.parquet", "aifs": "test_forecasts_aifs.parquet"}
 ABLATION = "ablation_forecasts.parquet"  # the reference forecasters on the AIFS run's exact inputs
-CONTEXT = "context_forecasts.parquet"  # the same, and TabPFN-3.5, with the context subsampled
+CONTEXT = "context_forecasts.parquet"  # their medians, and TabPFN-3.5's, with the context subsampled
 CONTEXT_SIZES = [250, 500, 1000, 2000, 4000]
 PROBABILISTIC = [
     "conformal",
-    "lgbm",
-    "lgbm+windfor",
     *[f"{run} {weather}" for run in ("tabpfn", "tabpfn+windfor", "tabpfn+windfor frozen") for weather in WEATHER],
 ]
 

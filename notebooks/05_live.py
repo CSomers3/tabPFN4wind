@@ -21,7 +21,7 @@ def _(mo):
     and NESO, each hour from the last update issued before it, to the end of tomorrow. Reads
     `notebooks/public/live.csv` and pulls outturn from Elexon.
 
-    Produces the README figure `live.png`.
+    Draws `assets/live.png`.
     """)
     return
 
@@ -54,7 +54,7 @@ def _(live, now, observed, pd, sources, start, style):
     _hours = pd.date_range(start, min(start + pd.Timedelta(hours=71), _issued.index[-1]), freq="h")
     _forecast = _issued.drop(columns="issue_time").reindex(_hours) / 1e3
     figure = style.fan_chart(_forecast, _forecast.windfor, observed / 1e3, now)
-    figure.savefig(sources.ROOT / "notebooks" / "live.png")
+    figure.savefig(sources.ROOT / "assets" / "live.png")
     figure
     return
 

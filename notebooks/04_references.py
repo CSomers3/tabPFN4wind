@@ -142,7 +142,7 @@ def _(cli, forecasts, plt, scaling, sources, style):
     _ax.set_xlabel("Context rows per monthly fit")
     style.header(_ax, "Held-out MAE, MW", [style.line(_p["median"], 1.6), style.line(_p["faint"]),
                                            style.line(_p["incumbent"])], ["TabPFN-3.5", "References", "NESO"])
-    figure_scaling.savefig(sources.ROOT / "notebooks" / "scaling.png")
+    figure_scaling.savefig(sources.ROOT / "assets" / "scaling.png")
     figure_scaling
     return
 

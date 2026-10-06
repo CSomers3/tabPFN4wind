@@ -136,7 +136,6 @@ def _():
     .page {{ color: {P["ink"]}; font: 14px/1.5 {FONT}; }}
     .page h1 {{ font-size: 30px; font-weight: 600; letter-spacing: -.02em; line-height: 1.15;
                 margin: 4px 0 10px; color: {P["ink"]}; }}
-    .page .lede {{ color: {P["ink2"]}; font-size: 15px; max-width: 620px; margin: 0; }}
     .bar {{ display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
             gap: 8px 24px; margin-top: 8px; font-size: 13px; color: {P["muted"]}; }}
     .bar b {{ color: {P["ink"]}; font-weight: 500; }}
@@ -165,7 +164,7 @@ def _():
     .chart .tip .note {{ font-size: 10.5px; }}
     .notes {{ color: {P["ink2"]}; max-width: 620px; margin: 4px 0 16px; }}
     .notes b {{ color: {P["ink"]}; font-weight: 600; }}
-    .scores {{ display: block; max-width: 600px; width: 100%; height: auto; font: 12px {FONT};
+    .scores {{ display: block; max-width: 720px; width: 100%; height: auto; font: 12px {FONT};
                font-variant-numeric: tabular-nums; }}
     .scores text {{ fill: {P["ink2"]}; }}
     .scores text.head, .scores text.ours, .scores text.value {{ fill: {P["ink"]}; }}
@@ -316,7 +315,7 @@ def _(P, np, pd):
 
     def scores(meta, W: int = 600) -> str:
         """Held-out MAE and 80% interval coverage, TabPFN-3.5 against NESO and the references."""
-        label, panel, gap, row, top = 190, 170, 40, 30, 30
+        label, panel, gap, row, top = 190, 150, 60, 28, 28
         mae_x, cover_x = label, label + panel + gap
         bottom = top + row * len(meta.scores)
         H = bottom + 16
@@ -336,12 +335,13 @@ def _(P, np, pd):
             out.append(f'<rect x="{mae_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
             out.append(f'<text x="{mae_x + width + 6:.1f}" y="{y + 15}" class="value">{mae:,}</text>')
             if cover is None:
-                out.append(f'<text x="{cover_x}" y="{y + 15}" class="note">point forecast only</text>')
+                out.append(f'<text x="{cover_x}" y="{y + 15}" class="note">no interval</text>')
                 continue
             width = cover * panel
             out.append(f'<rect x="{cover_x}" y="{y + 4}" width="{width:.1f}" height="14" rx="2" fill="{colour}"/>')
-            out.append(f'<text x="{W}" y="{y + 15}" text-anchor="end" class="value">{cover:.0%}</text>')
-        return f'<svg class="scores" viewBox="0 0 {W} {H}" role="img">{"".join(out)}</svg>'
+            out.append(f'<text x="{cover_x + panel + 8}" y="{y + 15}" class="value">{cover:.0%}</text>')
+        return (f'<svg class="scores" viewBox="0 0 {W} {H}" role="img" '
+                f'style="display:block;max-width:720px;width:100%;height:auto">{"".join(out)}</svg>')
 
     return chart, scores
 
@@ -352,8 +352,6 @@ def _(CSS, mo):
     <style>{CSS}</style>
     <header class="page">
       <h1>Great Britain wind power</h1>
-      <p class="lede">Outturn, the TabPFN-3.5 median with its 20–80% central intervals, and the NESO
-      forecast, hourly, from yesterday to the end of tomorrow.</p>
     </header>
     """)
     return
@@ -384,10 +382,11 @@ def _(P, chart, incumbent, live, mo, newest, now, observed, pd):
 
 
 @app.cell(hide_code=True)
-def _(meta, mo, scores):
+def _(CSS, meta, mo, scores):
     _scores = {name: (mae, cover) for name, mae, cover in meta.scores}
     _ours, _neso, _lgbm, _qrf = (_scores[k] for k in ("TabPFN-3.5", "NESO", "LightGBM", "Quantile regression forest"))
     _benchmark = mo.Html(f"""
+    <style>{CSS}</style>
     <div class="page">
       <p class="notes">Over {meta.days} held-out days, TabPFN-3.5 missed by <b>{_ours[0]:,} MW</b> on average,
       NESO by {_neso[0]:,}. Its 80% interval held {_ours[1]:.0%} of hours, with no calibration step.
@@ -396,7 +395,8 @@ def _(meta, mo, scores):
       {scores(meta)}
     </div>
     """)
-    _method = mo.Html("""
+    _method = mo.Html(f"""
+    <style>{CSS}</style>
     <div class="page">
       <p class="notes">Fifteen minutes after each NESO update, TabPFN-3.5 reads that forecast, the latest metered
       output, ECMWF AIFS 10 m wind at 20 capacity-weighted points, and every settled hour since April

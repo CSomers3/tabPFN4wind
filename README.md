@@ -8,9 +8,9 @@ Live since October 2026, after every NESO update: **[csomers3.github.io/tabPFN4w
 
 Wind supplies a third of Great Britain's electricity, and the grid is scheduled a day ahead on NESO's forecast of it. Any misses in the forecast can result in costly balancing actions, which ultimately inflate the cost of energy for consumers (~£1.5B in 2025, see **[https://wastedwind.energy/](https://wastedwind.energy/)**). NESO has been making strides in forecasting advancements to the UK grid partnering with OpenClimateFix **[see here](https://www.openclimatefix.org/insights/neso-adopts-ai-solar-forecasting-control-room)**. We used residual correction of NESO's own published forecast to enhance it using AI forecasting. 
 
-## Results
+### Results
 
-Held out: 2025-01-01 to 2026-09-15, 14,952 hours, scored once under the protocol frozen at commit [`8e4386d`](../../commit/8e4386d). All intervals are central intervals of the predictive distribution.
+Held out: 2025-01-01 to 2026-09-15, 14,952 hours. All intervals are central intervals of the predictive distribution.
 
 | MW | MAE | ΔMAE vs NESO [95% CI] | CRPS | 80% interval coverage | Winkler |
 |---|---|---|---|---|---|
@@ -21,7 +21,7 @@ Held out: 2025-01-01 to 2026-09-15, 14,952 hours, scored once under the protocol
 
 TabPFN-3.5 read ECMWF IFS weather in the pre-registered test; the AIFS rerun reproduces the gain on open data. The conformal reference was added after the test and tuned on 2024 only: its median is NESO's forecast shifted by NESO's own error quantiles within five forecast-level bins, so its MAE differs from NESO's. CRPS is twice the mean pinball loss over nine deciles, and equals MAE for a point forecast. Winkler is the 80% interval's width plus 10 times any distance outside it. Confidence intervals resample whole days.
 
-## Why TabPFN
+### Why TabPFN
 
 **Against tuned references.** A quantile LightGBM and a quantile regression forest were given TabPFN-3.5's exact AIFS inputs, context and monthly refits, with hyperparameters chosen by CRPS on Jul–Dec 2024 ([`04`](notebooks/04_references.py)):
 
@@ -54,7 +54,7 @@ TabPFN-3.5 read ECMWF IFS weather in the pre-registered test; the AIFS rerun rep
 
 TabPFN-3.5 does not need the hand-made power curve: on the weather as served it scores the same, within noise. The raw-column run followed the test; the held-out runs keep the frozen features.
 
-## How it works
+### Methods
 
 Each forecast used only what was public at its issue time, 15 minutes after NESO's last update before 08:30 UTC on the previous day (lead times 16 to 39 h). `dataset.check` enforces the timing on every row.
 
@@ -75,7 +75,7 @@ The live forecast is not the scored configuration. It runs after every NESO upda
 
 **Design decisions.** Features, target, context and embargo were fixed on 2024 data before the test. Capacity factor, not MW, was the target, so the context spans capacity growth. A one-day embargo covers curtailment data whose first publication time cannot be shown. Rejected: weather-only forecasts (TabPFN-3.5 ties NESO at 1,026 MW) and the Prior Labs suggestions above.
 
-## Reproduce
+### Reproduce
 
 ```bash
 make score    # Docker: builds the package and prints every table above from the committed forecasts
@@ -99,7 +99,7 @@ marimo edit notebooks/sample.py   # the whole pipeline on a six-month sample
 
 `data/` holds every input from April 2024, the six-month sample and all committed held-out forecasts. Notebooks [`01`](notebooks/01_data.py) to [`05`](notebooks/05_live.py) read only from the package in `src/windpfn/` and rebuild every number and figure in `assets/`. The [scheduled GitHub Action](https://github.com/CSomers3/tabPFN4wind/actions/workflows/live.yml) runs after each of NESO's eight daily updates and commits each forecast to `notebooks/public/live.csv` before its outturn exists.
 
-## Limitations
+### Limitations
 
 - The method post-processes NESO's forecast and needs it as an input.
 - The target is reconstructed. Wind farms that curtail themselves at negative prices, in about 3% of hours, are missing from it.
